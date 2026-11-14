@@ -265,7 +265,7 @@ function frame(pts, E = P.eyeOut) {
 }
 // 目の大きさ（目じり〜目がしらの長さ）を、映像の短い辺で割った値。スマホを顔に近づけるほど大きくなる
 const eyeSize = pts => (dist(pts[P.eyeOut[0]], pts[P.eyeIn[0]]) + dist(pts[P.eyeOut[1]], pts[P.eyeIn[1]])) / 2 / Math.min(video.videoWidth, video.videoHeight);
-const EYE_OK = [0.13, 0.20];   // 目のチェックで「OK」とする目の大きさ（仮。宮崎さんの端末の記録で詰める）
+const EYE_OK = [0.18, 0.25];   // OK とする目の大きさ。2026-11-14 宮崎さん「もっと顔を近づけさせる」で 0.13〜0.20 から約1.4倍近くへ（目の動きを大きく写すため）
 
 let camWanted = false, camErr = '';   // 一度つけたら、このページを閉じるまでカメラを保つ
 let camFacing = 'user';
@@ -405,7 +405,7 @@ async function gate() {
     if (!last) html = '顔が見えません<small>スマホを顔の正面に持ってください</small>';
     else {
       const v = eyeSize(last), good = v >= EYE_OK[0] && v <= EYE_OK[1];
-      const lo = 0.04, hi = 0.26, pos = clamp((v - lo) / (hi - lo), 0, 1) * 100;
+      const lo = 0.06, hi = 0.32, pos = clamp((v - lo) / (hi - lo), 0, 1) * 100;
       const zone = `<div class="meter"><i style="left:${(EYE_OK[0] - lo) / (hi - lo) * 100}%;width:${(EYE_OK[1] - EYE_OK[0]) / (hi - lo) * 100}%"></i><b style="left:${pos}%"></b></div>`;
       html = (good ? '<span class="ok">OK ✓</span><br>この近さのまま' : v < EYE_OK[0] ? 'スマホを<br>顔に近づけて' : '少し<br>離して') + zone +
         '<small>白い線が緑の帯に入ればOK</small>';
@@ -413,7 +413,7 @@ async function gate() {
       if (ok >= 7) done = true;      // 150ms × 7 ≒ 1秒、続けて OK
     }
     cue(html);
-    sk.style.display = !done && last && performance.now() - t0 > 7000 ? '' : 'none';   // 止まり続けないように、7秒で逃げ道を出す
+    sk.style.display = !done && last && eyeSize(last) >= EYE_OK[0] && performance.now() - t0 > 7000 ? '' : 'none';   // 7秒で逃げ道を出す。ただし遠いままは進ませない（近すぎて合わないときだけ）
     await sleep(150);
   }
   sk.remove();
@@ -515,7 +515,7 @@ function trajectory(t){if(t<period*2000)return 'cw';if(t<(period*2+1.5)*1000)ret
 async function startRun(){if(!demo&&!CAL?.ok)return;const my=++tok;if(!demo&&!camOK())await startCam();if(my!==tok)return;show('stage');dark(true);$('btns').replaceChildren();$('cameraChoice').replaceChildren();rows=[];period=Number($('seconds').value);phase='countdown';placeDot(1,0);for(const n of [3,2,1]){cue(String(n));await sleep(1000);if(my!==tok)return;}cue('');runStart=performance.now();phase='running';expose();requestAnimationFrame(runTick);}
 function runTick(now){if(phase!=='running')return;const t=now-runStart,d=trajectory(t);if(d==='done'){finish();return;}if(!d){cue('反対回り');placeDot(1,0);}else{cue('');const q=target(t,d);point={x:q.targetX,y:q.targetY};drawField(true);if(demo)capture(now,null,null);}requestAnimationFrame(runTick);}
 let missingSince=0;
-function capture(now,pts,bs){const t=now-runStart,direction=trajectory(t);if(!direction||direction==='done')return;const q=target(t,direction);rows.push({t,pts,bs,...q,direction,...(demo?{synthetic:synthetic(t,direction)}:{})});if(!demo&&!pts){missingSince||=now;$('faceWarning').textContent=now-missingSince>700?'顔が見えません':'';}else{missingSince=0;$('faceWarning').textContent='';}}
+function capture(now,pts,bs){const t=now-runStart,direction=trajectory(t);if(!direction||direction==='done')return;const q=target(t,direction);rows.push({t,pts,bs,...q,direction,...(demo?{synthetic:synthetic(t,direction)}:{})});if(!demo&&!pts){missingSince||=now;$('faceWarning').textContent=now-missingSince>700?'顔が見えません':'';}else{missingSince=0;$('faceWarning').textContent=!demo&&pts&&eyeSize(pts)<EYE_OK[0]*0.85?'スマホをもっと顔に近づけて':'';}}
 function demoCal(){return {ok:true,reliable:true,apRef:.3,x:{nm:'hx',mc:0,slope:1,sep:12},y:{nm:'vy',mc:0,slope:1,sep:12}};}
 function synthetic(t,direction){const q=target(t-150,direction),i=sector(q.angle);let a=q.angle,r=i===1?.65:1;if(i===5)a=Math.round(a/.35)*.35;return {X:1.3*r*Math.cos(a)+.1+.005*Math.sin(t*.029),Y:1.1*r*Math.sin(a)-.08+.005*Math.cos(t*.023),bl:false};}
 function syntheticRecords(p=8){period=p;const a=[];for(let t=0;t<(4*p+1.5)*1000;t+=1000/60){const direction=trajectory(t);if(direction)a.push({t,pts:null,bs:null,direction,...target(t,direction),synthetic:synthetic(t,direction)});}return a;}
