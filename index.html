@@ -1,90 +1,359 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#070707"><title>目の円トレース｜FNT</title><link rel="manifest" href="manifest.json"><link rel="icon" href="icons/favicon-32.png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#070707;color:#eee}*{box-sizing:border-box}body{margin:0;background:#070707;color:#eee}main{max-width:1000px;margin:auto;padding:28px 20px}h1{font-size:clamp(26px,5vw,42px)}p{line-height:1.8}button,select{font:inherit;padding:12px 18px;border-radius:10px;border:1px solid #555;background:#191919;color:#eee;margin:5px;cursor:pointer}button.primary{background:#22c1a6;color:#070707;border:0;font-weight:bold}button:disabled{opacity:.4;cursor:wait}.muted{color:#aaa;font-size:14px}.warn{color:#ffb576}section[hidden],[hidden]{display:none!important}#stage{position:fixed;inset:0;background:#070707}#field{width:100%;height:100%;display:block}#cue{position:absolute;top:20px;left:16px;right:150px;pointer-events:none}#count{position:absolute;inset:0;display:grid;place-items:center;font-size:64px;pointer-events:none}#stop{position:absolute;right:16px;bottom:16px}#preview{position:fixed;top:12px;right:12px;width:120px;z-index:5}#preview.align{top:15%;left:50%;right:auto;width:min(360px,calc(100vw - 32px));transform:translateX(-50%)}#camSel{max-width:100%;width: min(320px,100%)}#video{width:100%;display:block;transform:scaleX(-1);border-radius:8px}#ecPreviewMarks{background:transparent!important;position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1)}#align{position:absolute;bottom:32px;left:16px;right:150px}#resultCanvas{width:100%;height:auto;background:#070707;border:1px solid #333;border-radius:12px}.tables{overflow-x:auto}table{width:100%;border-collapse:collapse;white-space:nowrap;margin:12px 0 28px}th,td{text-align:right;padding:10px;border-bottom:1px solid #333}th:first-child,td:first-child{text-align:left}caption{text-align:left;font-weight:bold}#history button{display:block;width:100%;text-align:left}#orientation{color:#aaa;font-size:13px}@media (orientation:landscape){#orientation{display:none}}
+
+main{max-width:680px;padding:20px 14px}button,select{font-size:18px}#stage{background:#000}#cue{left:50%;top:50%;right:auto;transform:translate(-50%,-50%);width:92%;text-align:center;font-size:clamp(23px,6.6vw,34px);font-weight:800;line-height:1.45;z-index:6}#cue:empty{display:none}#cue small{display:block;font-size:16px;margin-top:8px}#preview{top:12px;left:12px;right:auto;width:120px}#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}#video{object-fit:contain}#btns,#cameraChoice{position:absolute;bottom:70px;left:12px;right:12px;text-align:center;z-index:8}#cameraChoice{bottom:130px}#stop{font-size:14px;padding:8px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:9}#faceWarning{position:absolute;top:12px;left:0;right:0;text-align:center;font-size:14px;color:#ffb576}.meter{height:16px;background:#333;position:relative;margin:16px 8px;border-radius:8px;overflow:hidden}.meter i{position:absolute;top:0;bottom:0;background:#22c1a680}.meter b{position:absolute;top:0;bottom:0;width:6px;background:white}.ok{color:#22c1a6}#camFix{position:fixed;bottom:15%;left:5%;width:90%;z-index:20}#resultCanvas{aspect-ratio:1}td,th{padding:8px 5px;font-size:14px}
 </style></head><body>
-<main id="home"><h1>目の円トレース</h1><p>頭を動かさず、目だけで点を追ってください。<br>PCかタブレットだとよく読めます。顔を画面から40〜50cm離してください。<br>明るい部屋で、眼鏡の反射に注意してください。</p><label>1周の秒数 <select id="seconds"><option>6</option><option selected>8</option><option>12</option></select></label><p>右回り2周 → 左回り2周</p><button id="start" class="primary" disabled>始める</button><button id="fullscreen">全画面</button><p id="loadState" role="status">読み込み中… 0%</p><p id="orientation">横にすると円が大きくなります</p><h2>前回の結果</h2><div id="history"></div><p class="muted">これは医療の検査ではありません。カメラの映像は端末の中だけで処理し、送信しません。</p></main>
-<section id="stage" hidden><canvas id="field"></canvas><div id="cue" role="status"></div><div id="count"></div><div id="align" hidden><button id="aligned" class="primary" disabled>顔と両目を映してください</button></div><button id="stop">中止</button></section>
-<div id="preview" hidden><video id="video" autoplay playsinline muted></video><canvas id="ecPreviewMarks"></canvas></div>
+<main id="home"><h1>目の円トレース</h1><p>スマホを手に持ち、顔の正面に<br>頭とスマホは動かさず、目だけで点を追う<br>明るい部屋で。眼鏡の反射に注意</p><label>1周の秒数 <select id="seconds"><option>6</option><option selected>8</option><option>12</option></select></label><p>右回り2周 → 左回り2周</p><button id="bStart" class="primary" disabled>始める</button><button id="fullscreen">全画面</button><p id="loadState" role="status">読み込み中… 0%</p><h2>前回の結果</h2><div id="history"></div><p class="muted">これは医療の検査ではありません。カメラの映像は端末の中だけで処理し、送信しません。</p></main>
+<section id="stage" hidden><canvas id="field"></canvas><div id="faceWarning"></div><div id="cue" role="status"></div><div id="count"></div><div id="btns"></div><div id="cameraChoice"></div><button id="stop">中止</button></section>
+<div id="preview" hidden><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
 <main id="result" hidden><h1>結果</h1><p id="demoLabel" class="warn" hidden>デモ：合成データによる表示です。</p><canvas id="resultCanvas" width="1000" height="1000"></canvas><p id="hard"></p><p id="quality" class="muted"></p><div id="tables" class="tables"></div><button id="png">画像で保存</button><button id="csv">CSV で保存</button><button id="again" class="primary">もう一度</button><button id="recalibrate">合わせからやり直す</button><button id="back">トップへ</button></main>
 <script type="module">
-const JUMP_MIN=0.12;
-const $=id=>document.getElementById(id), demo=new URLSearchParams(location.search).get('demo')==='1';
-const WASM='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/wasm', MODEL='https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
-const names=['右','右上','上','左上','左','左下','下','右下'], TAU=2*Math.PI, med=a=>{if(!a.length)return null;const b=[...a].sort((x,y)=>x-y),i=b.length>>1;return b.length%2?b[i]:(b[i-1]+b[i])/2;}, mean=a=>a.reduce((s,v)=>s+v,0)/a.length, wrap=a=>Math.atan2(Math.sin(a),Math.cos(a)), sector=a=>((Math.round(-a/(TAU/8))%8)+8)%8;
-let noFaceSince=null;
-const alignCue='頭を動かさず、顔と両目を映してください';
-let lm,stream,latest=null,lastVideo=-1,baseline=null,cal=null,rows=[],current=null,token=0,phase='home',collect=null,point=null,runStart=0,period=8,history=[];
-window.__ec={records:rows,calibration:cal,demo};
-const ctx=$('field').getContext('2d');
-function show(id){for(const s of ['home','stage','result'])$(s).hidden=s!==id;}
-function geometry(canvas){return {x:canvas.width/2,y:canvas.height/2,r:Math.min(canvas.width,canvas.height)*.42};}
-function resize(){const c=$('field');c.width=innerWidth*devicePixelRatio;c.height=innerHeight*devicePixelRatio;}
-addEventListener('resize',resize);resize();
-function dot(c,g,x,y){c.beginPath();c.arc(g.x+x*g.r,g.y+y*g.r,12*devicePixelRatio,0,TAU);c.fillStyle='#fff';c.fill();c.beginPath();c.arc(g.x+x*g.r,g.y+y*g.r,3*devicePixelRatio,0,TAU);c.fillStyle='#f44';c.fill();}
-function drawField(circle=false){const c=$('field'),g=geometry(c);ctx.clearRect(0,0,c.width,c.height);if(circle){ctx.beginPath();ctx.arc(g.x,g.y,g.r,0,TAU);ctx.strokeStyle='#555';ctx.lineWidth=devicePixelRatio;ctx.stroke();}if(point)dot(ctx,g,point.x,point.y);}
-function features(result){const p=result.faceLandmarks?.[0];if(!p||!p[473])return null;const w=$('video').videoWidth,h=$('video').videoHeight,px=i=>({x:p[i].x*w,y:p[i].y*h}),a=px(33),b=px(263),d=Math.hypot(b.x-a.x,b.y-a.y);if(!d)return null;const co=(b.x-a.x)/d,si=(b.y-a.y)/d,f=i=>{const q=px(i);return {x:((q.x-a.x)*co+(q.y-a.y)*si)/d,y:(-(q.x-a.x)*si+(q.y-a.y)*co)/d};};
-const eye=[[33,133,468,159,145],[263,362,473,386,374]].map(([o,i,c,u,l])=>{const A=f(o),B=f(i),C=f(c),width=Math.hypot(A.x-B.x,A.y-B.y);return [(C.x-(A.x+B.x)/2)/width,(C.y-(A.y+B.y)/2)/width,(f(l).y-f(u).y)/width];});const bs=Object.fromEntries((result.faceBlendshapes?.[0]?.categories||[]).map(b=>[b.categoryName,b.score])),v=k=>bs[k]??0;
-return {f:[1,mean(eye.map(e=>e[0])),mean(eye.map(e=>e[1])),(v('eyeLookOutRight')+v('eyeLookInLeft')-v('eyeLookInRight')-v('eyeLookOutLeft'))/2,(v('eyeLookUpLeft')+v('eyeLookUpRight')-v('eyeLookDownLeft')-v('eyeLookDownRight'))/2,mean(eye.map(e=>e[2]))],blink:Math.max(v('eyeBlinkLeft'),v('eyeBlinkRight'))>.5,ap:mean(eye.map(e=>e[2])),nose:px(1),distance:d,pose:pose(result.facialTransformationMatrixes?.[0]?.data),points:p};}
-function pose(m){return m?.length===16?{yaw:Math.atan2(-m[2],Math.hypot(m[0],m[1])),pitch:Math.atan2(m[6],m[10])}:null;}
-function headShift(s){if(!baseline||!s)return null;return {nose:Math.hypot(s.nose.x-baseline.nose.x,s.nose.y-baseline.nose.y)/baseline.distance,size:Math.abs(s.distance/baseline.distance-1),yaw:s.pose&&baseline.pose?Math.abs(wrap(s.pose.yaw-baseline.pose.yaw)):Infinity,pitch:s.pose&&baseline.pose?Math.abs(wrap(s.pose.pitch-baseline.pose.pitch)):Infinity};}
-function headMoved(h){return !!h&&(h.nose>.15||h.size>.10||h.yaw>6*Math.PI/180||h.pitch>6*Math.PI/180);}
-function blinking(s){return !!s&&(s.blink||(baseline?.ap>0&&s.ap<baseline.ap*.35));}
-function preview(s){const c=$('ecPreviewMarks');c.width=$('video').videoWidth;c.height=$('video').videoHeight;const x=c.getContext('2d');x.fillStyle='#22c1a6';for(const p of s?.points||[]){x.beginPath();x.arc(p.x*c.width,p.y*c.height,1,0,TAU);x.fill();}}
-function solve(A,b){A=A.map((r,i)=>[...r,b[i]]);for(let i=0;i<b.length;i++){let p=i;for(let j=i+1;j<b.length;j++)if(Math.abs(A[j][i])>Math.abs(A[p][i]))p=j;[A[i],A[p]]=[A[p],A[i]];const q=A[i][i];if(Math.abs(q)<1e-12)throw Error('合わせの計算ができません');for(let k=i;k<=b.length;k++)A[i][k]/=q;for(let j=0;j<b.length;j++)if(j!==i){const z=A[j][i];for(let k=i;k<=b.length;k++)A[j][k]-=z*A[i][k];}}return A.map(r=>r[b.length]);}
-function predict(f,c=cal){const z=f.map((v,i)=>i?(v-c.mu[i])/c.sd[i]:1);return {x:z.reduce((s,v,i)=>s+v*c.x[i],0),y:z.reduce((s,v,i)=>s+v*c.y[i],0)};}
-function regression(samples){const mu=[0,...Array.from({length:5},(_,j)=>mean(samples.map(s=>s.f[j+1])))],sd=[1,...Array.from({length:5},(_,j)=>Math.sqrt(mean(samples.map(s=>(s.f[j+1]-mu[j+1])**2)))||1)],z=samples.map(s=>s.f.map((v,i)=>i?(v-mu[i])/sd[i]:1)),A=Array.from({length:6},(_,i)=>Array.from({length:6},(_,j)=>z.reduce((s,v)=>s+v[i]*v[j],0)+(i===j&&i?1e-3:0))),axis=k=>solve(A,Array.from({length:6},(_,i)=>z.reduce((sum,v,j)=>sum+v[i]*samples[j][k],0))),c={mu,sd,x:axis('x'),y:axis('y')};
-return c;}
-function fit(samples){const unique=Array.from({length:9},(_,key)=>{const group=samples.filter(s=>s.key===key);return {key,f:Array.from({length:6},(_,j)=>mean(group.map(s=>s.f[j]))),x:group[0].x,y:group[0].y};}),c=regression(unique);c.error=mean(unique.map((s,i)=>{const p=predict(s.f,regression(unique.filter((_,j)=>j!==i)));return Math.hypot(p.x-s.x,p.y-s.y);}));c.samples=unique;return c;}
+
+const $ = id => document.getElementById(id);
+const query=new URLSearchParams(location.search),demo=query.get('demo')==='1',test=query.get('test')==='1';
+const mobile=/iPhone|iPad|Android/i.test(navigator.userAgent)||navigator.maxTouchPoints>0;
+const video=$('video'),ov=$('overlay'),oc=ov.getContext('2d');
+let FilesetResolver,FaceLandmarker;
+const WASM='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/wasm',MODEL='https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+let lm=null,last=null,lastBs=null,lastT=-1,rec=null,grab=null,tok=0,RUN={},phase='home',rows=[],current=null,period=8,runStart=0,point=null,history=[],selectedCamera=null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function calibrate(){const t=++token;phase='calibration';$('preview').classList.remove('align');$('align').hidden=true;const samples=[];try{for(let i=0;i<10;i++){const key=i===9?0:i,angle=-(i-1)*TAU/8;point=key?{x:Math.cos(angle),y:Math.sin(angle)}:{x:0,y:0};let frames;for(let attempt=0;attempt<=2;attempt++){$('cue').textContent=attempt?'有効なコマが足りません。同じ点をもう一度見てください':'点を目だけで見てください';drawField();await sleep(700);if(t!==token)return;frames=[];collect=frames;await sleep(1000);collect=null;if(t!==token)return;if(frames.length>=10)break;}if(frames.length<10)throw Error('有効なコマが足りません。顔の位置と明るさを確認してください。');if(key===0&&i===0)baseline.ap=med(frames.map(f=>f[5]));samples.push({key,...point,f:Array.from({length:6},(_,j)=>med(frames.map(f=>f[j])))});}cal=fit(samples);window.__ec.calibration=cal;point=null;drawField();phase='review';$('cue').textContent=`当てはまりの悪さ：${cal.error.toFixed(2)}${cal.error>.25?'。もう一度合わせることをおすすめします。':''}`;$('align').hidden=false;$('align').replaceChildren();const retry=document.createElement('button');retry.textContent='もう一度合わせる';retry.onclick=calibrate;const next=document.createElement('button');next.textContent='このまま進む';next.className='primary';next.onclick=startRun;$('align').append(retry,next);}catch(e){collect=null;point=null;drawField();$('cue').textContent=e.message;$('align').hidden=false;$('align').replaceChildren();const b=document.createElement('button');b.textContent='合わせをやり直す';b.onclick=calibrate;$('align').append(b);}}
-async function startRun(){if(!demo&&!cal)return;const t=++token;show('stage');$('align').hidden=true;$('preview').hidden=demo;rows=[];window.__ec.records=rows;period=Number($('seconds').value);phase='countdown';$('preview').classList.remove('align');point={x:1,y:0};$('cue').textContent='頭を動かさず、目だけで点を追ってください';drawField(true);for(const n of [3,2,1]){$('count').textContent=n;await sleep(1000);if(t!==token)return;}$('count').textContent='';runStart=performance.now();phase='running';}
-function trajectory(elapsed){const half=period*2;if(elapsed<half)return {direction:'cw',angle:elapsed/period*TAU};if(elapsed<half+1.5)return null;const t=elapsed-half-1.5;if(t>=half)return 'done';return {direction:'ccw',angle:-t/period*TAU};}
-function synthetic(a,t){let radius=sector(a)===1?.7:1,angle=a+.035*Math.sin(t*12);if(sector(a)===5)angle=Math.round(a/(TAU/8))*(TAU/8);return {x:radius*Math.cos(angle)+.018*Math.sin(t*29),y:radius*Math.sin(angle)+.018*Math.cos(t*23)};}
-function recordFrame(now,s){const elapsed=(now-runStart)/1000,tr=trajectory(elapsed);if(tr==='done'){finish();return;}if(!tr){$('cue').textContent='左回りに切り替えます';point={x:1,y:0};drawField(true);return;}const {angle,direction}=tr,targetX=Math.cos(angle),targetY=Math.sin(angle),g=demo?synthetic(angle,elapsed):s&&cal?predict(s.f):null,head=demo?0:headShift(s);point={x:targetX,y:targetY};$('cue').textContent=headMoved(head)?'頭が動いています':!demo&&!s?'顔と両目が読めません':'目だけで点を追ってください';rows.push({t:elapsed,direction,angle,targetX,targetY,X:g?.x??null,Y:g?.y??null,blink:demo?false:blinking(s),head,headMoved:headMoved(head),missing:!g});drawField(true);}
-function tick(now){let fresh=false;if(lm&&stream&&$('video').readyState>=2&&$('video').currentTime!==lastVideo){lastVideo=$('video').currentTime;fresh=true;try{latest=features(lm.detectForVideo($('video'),now));}catch{latest=null;}preview(latest);if(phase==='align'){$('aligned').disabled=!latest||blinking(latest);$('aligned').textContent=latest&&!blinking(latest)?'OK・目の合わせへ':'顔と両目を映してください';}if(collect&&latest&&!blinking(latest)&&!headMoved(headShift(latest))&&latest.f.every(Number.isFinite))collect.push(latest.f);}if(phase==='align'){if(latest){noFaceSince=null;$('cue').textContent=alignCue;}else{noFaceSince??=now;if(now-noFaceSince>=5000)$('cue').textContent=`顔が見つかりません。下の『カメラ』で別のカメラを選んでください（今：${stream?.getVideoTracks()[0]?.label||$('camSel')?.selectedOptions[0]?.textContent||'カメラ'}）`;}}if(phase==='running'&&(demo||fresh))recordFrame(now,latest);requestAnimationFrame(tick);}requestAnimationFrame(tick);
-function analyze(records){const valid=r=>!r.missing&&!r.blink&&!r.headMoved&&Number.isFinite(r.X)&&Number.isFinite(r.Y);let segment=0;const raw=records.map((r,i)=>{const prev=records[i-1];if(!valid(r)||!prev||!valid(prev)||r.direction!==prev.direction||r.t-prev.t>=.150||r.t<=prev.t)segment++;return {...r,valid:valid(r),segment,x:r.X,y:r.Y};}),sm=raw.map((r,i)=>{if(!r.valid)return r;const w=raw.slice(Math.max(0,i-1),i+2).filter(q=>q.valid&&q.segment===r.segment);return {...r,x:med(w.map(q=>q.X)),y:med(w.map(q=>q.Y))};}),events=[];let event=null;const flush=()=>{/* 1秒30コマのカメラでは本物の飛び（サッカード）は1〜2コマで終わるので、コマ数ではなく飛んだ幅（円の半径の12%以上）で数える。小さな揺れは読み取りの誤差として捨てる。しきい値は仮 */if(event&&Math.hypot(event.end.X-event.start.X,event.end.Y-event.start.Y)>=JUMP_MIN)events.push(event);event=null;};for(let i=1;i<raw.length;i++){const a=raw[i-1],b=raw[i],dt=b.t-a.t,fast=a.valid&&b.valid&&a.segment===b.segment&&dt>0&&Math.hypot(b.X-a.X,b.Y-a.Y)/dt>3*TAU/period;if(fast){if(!event)event={start:a,end:b,frames:1,direction:b.direction,sector:sector(b.angle)};else{event.end=b;event.frames++;}}else flush();}flush();const groups={};for(const dir of ['cw','ccw','all'])groups[dir]=names.map((name,i)=>{const a=raw.filter(r=>r.valid&&sector(r.angle)===i&&(dir==='all'||r.direction===dir));return {name,reach:med(a.map(r=>Math.hypot(r.X,r.Y))),lag:med(a.map(r=>wrap(r.angle-Math.atan2(r.Y,r.X))*(r.direction==='cw'?1:-1)*180/Math.PI)),jumps:events.filter(e=>e.sector===i&&(dir==='all'||e.direction===dir)).length,error:med(a.map(r=>Math.hypot(r.X-r.targetX,r.Y-r.targetY))),frames:a.length};});return {sm,events,groups};}
-const fmt=v=>v===null?'—':v.toFixed(2);
-function hardText(groups){const a=[...groups.all].filter(r=>r.frames).sort((a,b)=>b.error-a.error).slice(0,2);return a.length?'動きづらい方向：'+a.map(r=>`${r.name}（届き ${fmt(r.reach)}・飛び ${r.jumps}回）`).join('、'):'有効な記録がありません。合わせからやり直してください。';}
-function renderResult(data){current=data;period=data.period;rows=data.records||[];window.__ec.records=rows;window.__ec.calibration=data.calibration;window.__ec.result=data;show('result');$('preview').hidden=true;$('demoLabel').hidden=!data.demo;$('hard').textContent=data.hard;const bad=data.calibration?.error>.25||data.headRatio>.15||data.validCount===0;$('quality').textContent=`当てはまりの悪さ：${fmt(data.calibration?.error??null)} ／ 頭のずれのコマ割合：${(data.headRatio*100).toFixed(1)}%${bad?' ／ この回の結果は参考':''}`;$('again').disabled=!demo&&!cal;$('csv').disabled=!rows.length;const host=$('tables');host.replaceChildren();for(const [key,label]of [['cw','右回り'],['ccw','左回り'],['all','合計']]){const table=document.createElement('table');table.innerHTML=`<caption>${label}</caption><thead><tr><th>方向</th><th>届き</th><th>遅れ（度・＋が遅れ）</th><th>飛び（回）</th><th>ずれ</th></tr></thead><tbody>${data.groups[key].map(r=>`<tr><th>${r.name}</th><td>${fmt(r.reach)}${r.reach!==null&&r.reach<.8?' 届いていない':''}</td><td>${fmt(r.lag)}</td><td>${r.jumps}</td><td>${fmt(r.error)}</td></tr>`).join('')}</tbody>`;host.append(table);}drawResult(data);}
-function drawResult(data){const c=$('resultCanvas'),x=c.getContext('2d'),g={x:500,y:470,r:350};x.fillStyle='#070707';x.fillRect(0,0,c.width,c.height);x.fillStyle='#eee';x.font='24px system-ui';x.fillText('目の円トレース'+(data.demo?'（デモ）':''),35,40);for(let i=0;i<8;i++){const a=-i*TAU/8,e=data.groups.all[i].error,alpha=e===null?0:Math.min(.8,e);x.beginPath();x.arc(g.x,g.y,g.r+32,a-TAU/16,a+TAU/16);x.arc(g.x,g.y,g.r+8,a+TAU/16,a-TAU/16,true);x.closePath();x.fillStyle=`rgba(255,65,65,${alpha})`;x.fill();x.fillStyle='#eee';x.textAlign='center';x.fillText(names[i],g.x+Math.cos(a)*(g.r+64),g.y+Math.sin(a)*(g.r+64)+8);}x.textAlign='left';x.strokeStyle='#777';x.lineWidth=2;x.beginPath();x.arc(g.x,g.y,g.r,0,TAU);x.stroke();let prev=null;for(const r of data.trace){if(!r.valid){prev=null;continue;}if(prev&&prev.direction===r.direction&&prev.segment===r.segment){x.strokeStyle=r.direction==='cw'?'#57b8ff':'#ffa557';x.lineWidth=2;x.beginPath();x.moveTo(g.x+prev.x*g.r,g.y+prev.y*g.r);x.lineTo(g.x+r.x*g.r,g.y+r.y*g.r);x.stroke();}prev=r;}for(const e of data.events){const a={x:g.x+e.start.x*g.r,y:g.y+e.start.y*g.r},b={x:g.x+e.end.x*g.r,y:g.y+e.end.y*g.r},angle=Math.atan2(b.y-a.y,b.x-a.x);x.strokeStyle='#ff4545';x.fillStyle='#ff4545';x.lineWidth=3;x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke();x.beginPath();x.moveTo(b.x,b.y);x.lineTo(b.x-12*Math.cos(angle-.4),b.y-12*Math.sin(angle-.4));x.lineTo(b.x-12*Math.cos(angle+.4),b.y-12*Math.sin(angle+.4));x.closePath();x.fill();}x.font='19px system-ui';x.fillStyle='#57b8ff';x.fillText('青：右回り',35,925);x.fillStyle='#ffa557';x.fillText('橙：左回り',240,925);x.fillStyle='#ff4545';x.fillText('赤い矢印：飛び',450,925);x.fillStyle='#aaa';x.fillText('外周：ずれが大きい区画ほど赤',35,965);}
-function finish(){phase='result';point=null;const a=analyze(rows),data={date:new Date().toISOString(),demo,period,calibration:cal,records:rows,groups:a.groups,trace:a.sm.map(({x,y,valid,direction,segment})=>({x,y,valid,direction,segment})),events:a.events,headRatio:rows.length?rows.filter(r=>r.headMoved).length/rows.length:0,validCount:a.sm.filter(r=>r.valid).length,hard:hardText(a.groups)};renderResult(data);try{const {records,calibration,...summary}=data;history.unshift({...summary,calibration:calibration?{error:calibration.error}:null});history=history.slice(0,20);localStorage.setItem('eye-circle-history',JSON.stringify(history));renderHistory();}catch{$('quality').textContent+=' ／ 端末への保存ができませんでした';}}
-function renderHistory(){const h=$('history');h.replaceChildren();if(!history.length){h.textContent='まだ記録はありません';return;}for(const d of history){const b=document.createElement('button');b.textContent=`${new Date(d.date).toLocaleString('ja-JP')} ${d.demo?'［デモ］ ':''}${d.hard}`;b.onclick=()=>renderResult(d);h.append(b);}}
-function cancel(){token++;phase='home';collect=null;point=null;$('count').textContent='';show('home');$('preview').hidden=true;}
-function savedCamera(){try{return localStorage.getItem('eyeCircleCamera');}catch{return null;}}
-function saveCamera(id){try{if(id)localStorage.setItem('eyeCircleCamera',id);else localStorage.removeItem('eyeCircleCamera');}catch{}}
-async function openCamera(id){stream?.getTracks().forEach(t=>t.stop());stream=null;latest=null;lastVideo=-1;noFaceSince=null;const b=$('aligned');if(b){b.disabled=true;b.textContent='顔と両目を映してください';}preview(null);stream=await navigator.mediaDevices.getUserMedia({video:{...(id?{deviceId:{exact:id}}:{facingMode:'user'}),width:{ideal:1280},height:{ideal:720}}});$('video').srcObject=stream;await $('video').play();}
-async function cameraOptions(){const devices=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'),sel=$('camSel'),id=stream?.getVideoTracks()[0]?.getSettings().deviceId;sel.replaceChildren();for(const d of devices){const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||'カメラ';o.selected=d.deviceId===id;sel.append(o);}return devices;}
-async function begin(){
-const my=token;
-try{
-if(demo){await startRun();return;}
-if(!stream?.getVideoTracks().length||!stream.getVideoTracks().every(t=>t.readyState==='live')){
-const saved=savedCamera();let restored=false;
-if(saved){try{await openCamera(saved);if(my!==token)return;restored=true;}catch{if(my!==token)return;saveCamera(null);}}
-if(!restored){
-await openCamera();if(my!==token)return;
-const devices=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
-if(my!==token)return;
-const real=devices.filter(d=>!/virtual|obs|scanner|snap camera|mmhmm|ndi|manycam|xsplit/i.test(d.label)),preferred=real.find(d=>/macbook|facetime|内蔵|built-?in|integrated/i.test(d.label))||real[0];
-const previousId=stream.getVideoTracks()[0]?.getSettings().deviceId;
-if(preferred&&preferred.deviceId!==previousId){
-try{await openCamera(preferred.deviceId);if(my!==token)return;}
-catch{if(my!==token)return;await openCamera(previousId);if(my!==token)return;}
+const TAU=2*Math.PI,names=['右','右上','上','左上','左','左下','下','右下'];
+const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a)),sector=a=>((Math.round(a/(TAU/8))%8)+8)%8;
+let P = { eyeOut: [33, 263], eyeIn: [133, 362], mouth: [61, 291], brow: [105, 334], lidUp: [159, 386], lidDn: [145, 374], iris: [468, 473], cheek: [234, 454] };
+let sideChecked = false;
+const BSN = ['eyeLookInLeft', 'eyeLookOutLeft', 'eyeLookUpLeft', 'eyeLookDownLeft', 'eyeLookInRight', 'eyeLookOutRight', 'eyeLookUpRight', 'eyeLookDownRight', 'eyeBlinkLeft', 'eyeBlinkRight', 'jawOpen', 'tongueOut', 'mouthSmileLeft', 'mouthSmileRight', 'browInnerUp', 'browOuterUpLeft', 'browOuterUpRight'];
+// GPU で顔の点が取れない端末がある（Android の Chrome で、顔が映っていても点が出なかった）。取れない・エラーが続いたら CPU に切り替える
+let delegate = '', toCPU = async () => {}, switching = false, gpuMiss = 0;
+
+async function grabAll(urls, onPct) {
+  const tot = urls.map(() => 0), got = urls.map(() => 0);
+  const show = () => { const T = tot.reduce((a, b) => a + b, 0); if (T) onPct(Math.min(99, Math.round(got.reduce((a, b) => a + b, 0) / T * 100))); };
+  return Promise.all(urls.map(async (u, i) => {
+    const r = await fetch(u); if (!r.ok || !r.body) throw new Error(r.status + ' ' + u.split('/').pop());
+    tot[i] = [12997248, 3758596][i];   // 中身の大きさ（部品は圧縮して届くので content-length は使えない。版を上げたら測り直す）
+    const rd = r.body.getReader(), parts = [];
+    for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got[i] += value.length; show(); }
+    const out = new Uint8Array(got[i]); let o = 0; for (const c of parts) { out.set(c, o); o += c.length; }
+    return out;
+  }));
 }
+async function load() {
+  let model = null;
+  try { [, model] = await grabAll([WASM + '/vision_wasm_internal.wasm', MODEL], n => { $('loadState').textContent = `読み込み中… ${n}%`; }); }
+  catch (e) { model = null; }   // 取れなければ、これまでどおり MediaPipe に任せる
+  const fs = await FilesetResolver.forVisionTasks(WASM);
+  const opt = d => ({ baseOptions: model ? { modelAssetBuffer: model, delegate: d } : { modelAssetPath: MODEL, delegate: d }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true });   // 顔の向きの行列：首を横に倒すときに混ざる回旋・上下を読む（2026-10-16）
+  try { lm = await FaceLandmarker.createFromOptions(fs, opt('GPU')); delegate = 'GPU'; }
+  catch (e) { lm = await FaceLandmarker.createFromOptions(fs, opt('CPU')); delegate = 'CPU'; }
+  toCPU = async () => { if (delegate === 'CPU' || switching) return; switching = true; try { lm = await FaceLandmarker.createFromOptions(fs, opt('CPU')); delegate = 'CPU'; } finally { switching = false; } };
+  window.__lm = lm;
+  $('loadState').textContent = '準備ができました。';
+  $('bStart').disabled = false; pickSync();
 }
+function px(l) { return { x: l.x * video.videoWidth, y: l.y * video.videoHeight }; }
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN;
+const med = a => { if (!a.length) return NaN; const v = [...a].sort((x, y) => x - y), n = v.length >> 1; return v.length % 2 ? v[n] : (v[n - 1] + v[n]) / 2; };
+const mad = a => { const m = med(a); return med(a.map(x => Math.abs(x - m))); };
+const sd = a => { const m = mean(a); return Math.sqrt(mean(a.map(x => (x - m) ** 2))); };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pct = (a, b) => { const m = Math.max(Math.abs(a), Math.abs(b)); return m < 1e-6 ? 0 : Math.round(Math.abs(a - b) / m * 100); };
+const f2 = v => Number.isFinite(v) ? (Math.round(v * 100) / 100).toFixed(2) : '—';
+const r0 = v => Number.isFinite(v) ? Math.round(v) : null;
+const r3 = v => Number.isFinite(v) ? Math.round(v * 1000) / 1000 : null;
+function sideWord(r, l, big = '大きい') { if (Math.max(r, l) < 0.02) return '動きが小さく、比べられませんでした'; if (pct(r, l) < 15) return '左右ほぼ同じ'; return (r > l ? '右' : '左') + 'のほうが' + big; }
+
+// 目の線を水平に回して、目の間の長さを1にした座標（顔の傾き・カメラとの距離に左右されない）。
+// x は「本人の右 → 本人の左」が＋（写っている映像のまま。鏡にしていない）
+function frame(pts, E = P.eyeOut) {
+  const a = pts[E[0]], b = pts[E[1]];
+  const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, d = dist(a, b);
+  let ang = Math.atan2(b.y - a.y, b.x - a.x);
+  if (ang > Math.PI / 2) ang -= Math.PI; else if (ang < -Math.PI / 2) ang += Math.PI;
+  const cs = Math.cos(-ang), sn = Math.sin(-ang);
+  const f = p => { const x = p.x - c.x, y = p.y - c.y; return { x: (x * cs - y * sn) / d, y: (x * sn + y * cs) / d }; };
+  const ci = Math.cos(ang), si = Math.sin(ang);
+  const inv = q => ({ x: c.x + (q.x * ci - q.y * si) * d, y: c.y + (q.x * si + q.y * ci) * d });
+  return { f, inv, d, ang, c };
 }
-show('stage');$('preview').hidden=false;$('preview').classList.add('align');$('align').hidden=false;$('align').innerHTML='<button id="aligned" class="primary" disabled>顔と両目を映してください</button><label>カメラ <select id="camSel"></select></label>';
-await cameraOptions();if(my!==token)return;
-$('camSel').onchange=async()=>{const sel=$('camSel'),id=sel.value;sel.disabled=true;try{await openCamera(id);if(my!==token)return;saveCamera(id);await cameraOptions();if(my!==token)return;$('cue').textContent=alignCue;}catch(e){if(my!==token)return;$('cue').textContent='カメラを切り替えられません：'+e.message;}finally{sel.disabled=false;}};
-$('aligned').onclick=()=>{if(!latest||blinking(latest))return;baseline={nose:{...latest.nose},distance:latest.distance,pose:latest.pose,ap:null};calibrate();};phase='align';noFaceSince=null;point=null;drawField();$('cue').textContent=alignCue;
-}catch(e){if(my!==token)return;$('loadState').textContent='カメラを開始できません：'+e.message;}
+// 目の大きさ（目じり〜目がしらの長さ）を、映像の短い辺で割った値。スマホを顔に近づけるほど大きくなる
+const eyeSize = pts => (dist(pts[P.eyeOut[0]], pts[P.eyeIn[0]]) + dist(pts[P.eyeOut[1]], pts[P.eyeIn[1]])) / 2 / Math.min(video.videoWidth, video.videoHeight);
+const EYE_OK = [0.13, 0.20];   // 目のチェックで「OK」とする目の大きさ（仮。宮崎さんの端末の記録で詰める）
+
+let camWanted = false, camErr = '';   // 一度つけたら、このページを閉じるまでカメラを保つ
+let camFacing = 'user';
+async function startCam(facing = camFacing) {
+  const my = tok;
+  camWanted = true; camFacing = facing;
+  if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+  let s;
+  try {
+    s = await navigator.mediaDevices.getUserMedia({ video: { ...(mobile || !selectedCamera ? { facingMode: facing } : { deviceId: { exact: selectedCamera } }), width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 60 } }, audio: false });
+  } catch (e) {
+    if (my !== tok || !camWanted) return;
+    if (mobile || !selectedCamera) throw e;
+    selectedCamera = null;
+    try { localStorage.removeItem('eyeCircleCamera'); } catch {}
+    return startCam('user');
+  }
+  if (my !== tok || !camWanted) { s.getTracks().forEach(t => t.stop()); return; }
+  video.srcObject = s;
+  await video.play();
+  s.getVideoTracks()[0].addEventListener('ended', () => reviveCam('ended'));
+  wake();
+  if (facing === 'user') RUN.cam ={ w: video.videoWidth, h: video.videoHeight, screen: [innerWidth, innerHeight, window.devicePixelRatio || 1], fpsSetting: s.getVideoTracks()[0]?.getSettings?.().frameRate || null, settings: (() => { const g = s.getVideoTracks()[0]?.getSettings?.() || {}; return { w: g.width, h: g.height }; })() };
+  if (!looping) { looping = true; loop(); }
 }
+// 戻ってきたとき・映像が2秒止まったとき・カメラが切れたときに、カメラを開き直す。測っている段はそのまま続く
+let looping = false, reviving = false, stillSince = 0, wl = null;
+async function wake() { try { if (navigator.wakeLock && !wl) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => { wl = null; }); } } catch (e) {} }   // 使っている間は画面を消さない
+const camOK = () => { const t = video.srcObject && video.srcObject.getVideoTracks()[0]; return !!(t && t.readyState === 'live' && !t.muted); };
+function camFixBtn(show) {
+  let b = $('camFix');
+  if (!show) { if (b) b.remove(); return; }
+  if (!b) { b = document.createElement('button'); b.id = 'camFix'; document.body.appendChild(b);
+    b.onclick = async () => { b.disabled = true; b.textContent = 'カメラをつけています…'; try { await startCam(); camErr = ''; camFixBtn(false); } catch (e) { camErr = e.name || String(e); camFixBtn(true); } }; }
+  b.disabled = false; b.textContent = 'カメラが止まりました。ここを押してつけ直す' + (camErr ? `（${camErr}）` : '');
+}
+async function reviveCam(why) {
+  if (reviving || !camWanted || document.hidden) return;
+  reviving = true; window.__revive = (window.__revive || 0) + 1; window.__reviveWhy = why;
+  let ok = false;
+  for (let i = 0; i < 3 && !ok; i++) { try { await startCam(); camErr = ''; ok = true; } catch (e) { camErr = e.name || String(e); window.__camErr = camErr; await sleep(1000); } }
+  camFixBtn(!ok);
+  stillSince = 0; reviving = false;
+}
+let srcSig = null;
+const pageSig = async () => { try { const t = await (await fetch(location.pathname + '?sig=' + Date.now(), { cache: 'no-store' })).text(); let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return h; } catch (e) { return null; } };
+const idle = () => phase === 'home' || phase === 'result';
+pageSig().then(h => { srcSig = h; });
+async function checkUpdate() { const h = await pageSig(); if (h != null && srcSig != null && h !== srcSig && idle()) location.reload(); }
+
+function releaseCam() { if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; } stillSince = 0; }
+addEventListener('pagehide', releaseCam);
+addEventListener('pageshow', e => { if (e.persisted) { checkUpdate(); if (camWanted) reviveCam('pageshow'); } });
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden) { releaseCam(); return; }
+  checkUpdate();
+  if (!camWanted) return;
+  wake(); await sleep(400);   // 戻った直後はカメラを開けない端末があるので、少し待つ
+  if (!camOK()) reviveCam('back'); else video.play().catch(() => reviveCam('play'));
+});
+let OVU = 1;
+// 顔の読み取りには、映像をいったん映像と同じ大きさのキャンバスに写してから渡す。
+// キャンバスに写せば、点の位置は必ずこのキャンバス（＝videoWidth×videoHeight）の上の位置になる
+const detC = document.createElement('canvas'), detX = detC.getContext('2d');
+function frameCanvas() {
+  const w = video.videoWidth, h = video.videoHeight;
+  if (detC.width !== w || detC.height !== h) { detC.width = w; detC.height = h; }
+  detX.drawImage(video, 0, 0, w, h);
+  return detC;
+}
+function fitOverlay() {
+  const W = ov.clientWidth, H = ov.clientHeight, r = window.devicePixelRatio || 1, vw = video.videoWidth, vh = video.videoHeight;
+  const cw = Math.round(W * r), ch = Math.round(H * r);
+  if (ov.width !== cw || ov.height !== ch) { ov.width = cw; ov.height = ch; }
+  oc.setTransform(1, 0, 0, 1, 0, 0); oc.clearRect(0, 0, cw, ch);
+  if (!vw || !vh || !W || !H) return;
+  const k = Math.min(W / vw, H / vh), ox = (W - vw * k) / 2, oy = (H - vh * k) / 2;
+  oc.setTransform(-k * r, 0, 0, k * r, (ox + vw * k) * r, oy * r);
+  OVU = 1 / k;
+}
+function loop() {
+  if (video.readyState >= 2 && video.currentTime !== lastT) {
+    lastT = video.currentTime;
+    const t = performance.now();
+    let r = null;
+    if (!switching) { try { r = lm.detectForVideo(frameCanvas(), t); } catch (e) { window.__detErr = e.message; toCPU(); } }
+    const got = !!(r && r.faceLandmarks && r.faceLandmarks[0]);
+    gpuMiss = got ? 0 : gpuMiss + 1;
+    if (delegate === 'GPU' && gpuMiss > 45) toCPU();   // GPU で約3秒続けて顔が取れなければ、CPU に切り替える（一度だけ）
+    window.__delegate = delegate;
+    fitOverlay();
+    if (got) {
+      const pts = r.faceLandmarks[0].map(px);
+      if (!sideChecked) {   // 写っている映像（鏡にしていない）では、本人の右は画面の左＝x が小さい
+        if (pts[33].x > pts[263].x) for (const k in P) P[k] = [P[k][1], P[k][0]];
+        sideChecked = true;
+      }
+      let bs = null;
+      const cat = r.faceBlendshapes && r.faceBlendshapes[0] && r.faceBlendshapes[0].categories;
+      if (cat) { bs = {}; for (const c of cat) if (BSN.includes(c.categoryName)) bs[c.categoryName] = c.score; }
+      last = pts; lastBs = bs; window.__last = pts;
+      const u = OVU;   // 画面の 1px が映像の何画素か（点の大きさを画面の上でそろえる）
+      oc.fillStyle = 'rgba(90,209,139,.9)';
+      for (let i = 0; i < pts.length; i += 2) oc.fillRect(pts[i].x - 1.3 * u, pts[i].y - 1.3 * u, 2.6 * u, 2.6 * u);
+      oc.fillStyle = '#ffcc00';
+      for (const i of [...P.iris, 1]) { oc.beginPath(); oc.arc(pts[i].x, pts[i].y, 3.5 * u, 0, 7); oc.fill(); }
+      // 頭から見たカメラの向き（頭の回旋・上下）。首を横に倒しても（顔の線が傾いても）値が変わらない取り方。
+      let hp = null; const M = r.facialTransformationMatrixes && r.facialTransformationMatrixes[0];
+      if (M && M.data) { const m = M.data; hp = { rot: Math.atan2(m[2], m[10]) * 180 / Math.PI, up: -Math.atan2(m[6], m[10]) * 180 / Math.PI }; }
+      window.__hp = hp;
+      if (rec) rec.push({ t, pts, bs });
+    } else { last = null; lastBs = null; }
+    if (phase === 'running') capture(t, got ? last : null, got ? lastBs : null);
+    window.__frames = (window.__frames || 0) + 1;
+    window.__faceSeen = (window.__faceSeen || 0) + (last ? 1 : 0);
+  }
+  // カメラが切れた・止まったまま（映像が止まっても currentTime は進むことがあるので、カメラそのものの状態を見る）
+  const tr = video.srcObject && !document.hidden && video.srcObject.getVideoTracks()[0];
+  if (tr && (tr.readyState === 'ended' || tr.muted || video.paused || video.readyState < 2)) {
+    const now = performance.now(); if (!stillSince) stillSince = now;
+    if (now - stillSince > 2000) reviveCam(tr.readyState === 'ended' ? 'ended' : tr.muted ? 'muted' : 'still');
+  } else if (tr) stillSince = 0;
+  requestAnimationFrame(loop);
+}
+async function record(ms, onTick) {
+  const mine = rec = [], my = tok, t0 = performance.now();   // やり直しで段が変わったら、すぐ抜ける（次の段の記録を横取りしない）
+  while (performance.now() - t0 < ms && my === tok) { if (onTick) onTick((performance.now() - t0) / ms); await sleep(16); }
+  if (my !== tok) return null;
+  if (rec === mine) rec = null; return mine;
+}
+async function gate() {
+  const my = tok, t0 = performance.now(); let ok = 0, skipped = false, done = false;
+  dark(false);
+  const sk = btn('この近さのまま進む', () => { skipped = true; }, 'sub'); sk.style.display = 'none';
+  while (my === tok && !done && !skipped) {
+    let html;
+    if (!last) html = '顔が見えません<small>スマホを顔の正面に持ってください</small>';
+    else {
+      const v = eyeSize(last), good = v >= EYE_OK[0] && v <= EYE_OK[1];
+      const lo = 0.04, hi = 0.26, pos = clamp((v - lo) / (hi - lo), 0, 1) * 100;
+      const zone = `<div class="meter"><i style="left:${(EYE_OK[0] - lo) / (hi - lo) * 100}%;width:${(EYE_OK[1] - EYE_OK[0]) / (hi - lo) * 100}%"></i><b style="left:${pos}%"></b></div>`;
+      html = (good ? '<span class="ok">OK ✓</span><br>この近さのまま' : v < EYE_OK[0] ? 'スマホを<br>顔に近づけて' : '少し<br>離して') + zone +
+        '<small>白い線が緑の帯に入ればOK</small>';
+      ok = good ? ok + 1 : 0;
+      if (ok >= 7) done = true;      // 150ms × 7 ≒ 1秒、続けて OK
+    }
+    cue(html);
+    sk.style.display = !done && last && performance.now() - t0 > 7000 ? '' : 'none';   // 止まり続けないように、7秒で逃げ道を出す
+    await sleep(150);
+  }
+  sk.remove();
+  if (done) { cue('<span class="ok">OK ✓</span><br>この近さのまま'); await sleep(800); await voiceQuiet(2500); }
+  return { eye: last ? r3(eyeSize(last)) : null, ok: done };
+}
+// 1コマから目の特徴を取る。右目（s=0）・左目（s=1）は本人の向き
+function eyeFeat(pts) {
+  const { f } = frame(pts), o = {};
+  for (const s of [0, 1]) {
+    const a = f(pts[P.eyeOut[s]]), b = f(pts[P.eyeIn[s]]), c = f(pts[P.iris[s]]), w = dist(a, b), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    o['hx' + s] = (c.x - m.x) / w;   // ＋＝本人の左へ
+    o['vy' + s] = (c.y - m.y) / w;   // ＋＝下へ
+    o['ap' + s] = (f(pts[P.lidDn[s]]).y - f(pts[P.lidUp[s]]).y) / w;
+  }
+  return o;
+}
+function feats({ pts, bs }) {
+  const e = eyeFeat(pts), b = k => (bs && Number.isFinite(bs[k])) ? bs[k] : NaN;
+  return {
+    hx: -(e.hx0 + e.hx1) / 2,                                                                                      // ＋＝本人の右を見る
+    bsX: (b('eyeLookOutRight') + b('eyeLookInLeft') - b('eyeLookInRight') - b('eyeLookOutLeft')) / 2,
+    vy: -(e.vy0 + e.vy1) / 2,                                                                                      // ＋＝上を見る
+    ap: (e.ap0 + e.ap1) / 2,
+    bsY: (b('eyeLookUpLeft') + b('eyeLookUpRight') - b('eyeLookDownLeft') - b('eyeLookDownRight')) / 2,
+    blinkBs: Math.min(b('eyeBlinkLeft'), b('eyeBlinkRight')),
+    e,
+  };
+}
+// 目の合わせ（5か所の点を見る）：一人ひとりの「黒目の位置 → 画面のどこを見ているか」の換算を作る。
+// 横・たてそれぞれ、いちばん見分けがつく特徴（黒目の位置／まぶたの開き／MediaPipe の視線の値）を選ぶ
+let CAL = null;
+const CAL_MIN = 2;
+function fitAxis(segs, negK, posK, names) {
+  let best = null; const all = [];
+  for (const nm of names) {
+    const v = k => segs.filter(s => s.k === k || (k === 'C' && s.k === 'C2')).flatMap(s => s.F.map(f => f[nm])).filter(Number.isFinite);
+    const n = v(negK), p = v(posK), c = v('C');
+    if (n.length < 3 || p.length < 3 || c.length < 3) continue;
+    const mn = med(n), mp = med(p), mc = med(c), slope = (mp - mn) / 2;
+    const noise = (mad(n) + mad(p) + mad(c)) / 3 * 1.4826 + 1e-6;
+    let sep = Math.abs(mp - mn) / noise; const mono = (mc - mn) * (mp - mc) > 0; if (!mono) sep /= 2;
+    const o = { nm, mc, slope, sep: Math.round(sep * 10) / 10, mono };
+    if (Math.abs(slope) > 1e-6) { all.push(o); if (!best || sep > best.sep) best = o; }
+  }
+  if (best) Object.defineProperty(best, 'all', { value: all, enumerable: false });   // 追従では、組ごとに点の動きといちばん合う読み方を選び直す（下の pickSeries）。all は best 自身を含むので、数えない形にして記録（JSON）に入れない（2026-11-04：入れると循環して saveRun が黙って失敗し、目の検査をした回が保存されなかった）
+  return best;
+}
+function fitCalib(segs) {
+  segs.forEach(s => { s.F = s.fr.map(feats); });
+  const x = fitAxis(segs, 'L', 'R', ['hx', 'bsX']), y = fitAxis(segs, 'D', 'U', ['vy', 'bsY', 'ap']);
+  const apRef = med(segs.filter(s => s.k[0] === 'C').flatMap(s => s.F.map(f => f.ap)));
+  // 見分けが 2 未満の向きは、目の位置の読み取りが不安定（その向きの数字・判定は信用しない）
+  return { ok: !!(x && y), reliable: !!(x && y && x.sep >= CAL_MIN && y.sep >= CAL_MIN), x, y, apRef, frames: segs.reduce((s, g) => s + g.fr.length, 0) };
+}
+function series(fr, cx = CAL.x, cy = CAL.y) {   // コマ → 画面上の視線（X 右＋・Y 上＋）
+  return fr.map(o => {
+    const F = feats(o), X = (F[cx.nm] - cx.mc) / cx.slope, Y = (F[cy.nm] - cy.mc) / cy.slope;
+    const bl = (F.blinkBs > 0.7) || F.ap < CAL.apRef * 0.35;
+    return { t: o.t, X, Y, bl, e: F.e };
+  });
+}
+async function calibrate() {
+  const my = tok; dark(true);
+  cue('出る点を<br><b>目だけ</b>で見る'); await sleep(2600); if (my !== tok) return null; cue('');
+  const segs = [];
+  for (const [k, x, y] of [['C', 0, 0], ['R', 1, 0], ['L', -1, 0], ['U', 0, 1], ['D', 0, -1], ['C2', 0, 0]]) {
+    if (my !== tok) return null;
+    placeDot(x, y); await sleep(700);
+    if (my !== tok) return null;
+    const fr = await record(1100);
+    if (my !== tok) return null;
+    segs.push({ k, x, y, fr });
+  }
+  hideDot();
+  const c = fitCalib(segs);
+  RUN.calib = { x: c.x, y: c.y, reliable: c.reliable, apRef: r3(c.apRef), frames: c.frames };
+  return c;
+}
+
+const voiceQuiet=async()=>{};
+
+function cue(html){$('cue').innerHTML=html;}
+function btn(label,fn,cls=''){const b=document.createElement('button');b.textContent=label;b.className=cls;b.onclick=fn;$('btns').append(b);return b;}
+function dark(on){$('preview').hidden=on;}
+function pickSync(){}
+function show(id){for(const s of ['home','stage','result'])$(s).hidden=s!==id;}
+function geometry(c=$('field')){return {x:c.width/2,y:c.height/2,r:.44*Math.min(c.width,c.height)};}
+function resize(){const c=$('field');c.width=innerWidth*devicePixelRatio;c.height=innerHeight*devicePixelRatio;drawField();}
+function placeDot(x,y){point={x,y};drawField();}
+function hideDot(){point=null;drawField();}
+function drawField(circle=phase==='running'||phase==='countdown'){const c=$('field'),ctx=c.getContext('2d'),g=geometry(c);ctx.clearRect(0,0,c.width,c.height);if(circle){ctx.strokeStyle='#555';ctx.lineWidth=devicePixelRatio;ctx.beginPath();ctx.arc(g.x,g.y,g.r,0,TAU);ctx.stroke();}if(point){ctx.fillStyle='#eee';ctx.beginPath();ctx.arc(g.x+point.x*g.r,g.y-point.y*g.r,11*devicePixelRatio,0,TAU);ctx.fill();}}
+addEventListener('resize',resize);resize();
+function expose(a){if(test)window.__ec={records:rows,rec:rows,calibration:CAL,CAL,analyze,series,syntheticRecords,result:a||current};}
+async function chooseDesktop(autoStart=true){if(mobile)return;const devices=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'),real=devices.filter(d=>!/virtual|obs|scanner|snap camera|mmhmm|ndi|manycam|xsplit/i.test(d.label));let saved;try{saved=localStorage.getItem('eyeCircleCamera');}catch{}const preferred=real.find(d=>d.deviceId===saved)||real.find(d=>/macbook|facetime|内蔵|built-?in|integrated/i.test(d.label))||real[0];if(autoStart&&preferred&&preferred.deviceId!==video.srcObject?.getVideoTracks()[0]?.getSettings().deviceId){selectedCamera=preferred.deviceId;await startCam();}const sel=document.createElement('select');sel.setAttribute('aria-label','カメラ');for(const d of devices){const o=new Option(d.label||'カメラ',d.deviceId);o.selected=d.deviceId===selectedCamera;sel.add(o);}sel.onchange=async()=>{selectedCamera=sel.value;try{await startCam();if(selectedCamera)localStorage.setItem('eyeCircleCamera',selectedCamera);}catch(e){cue('カメラを切り替えられません：'+e.message);}};$('cameraChoice').replaceChildren(sel);}
+async function begin(){const my=++tok;show('stage');$('btns').replaceChildren();try{if(demo){CAL=demoCal();await startRun();return;}phase='gate';await startCam();if(my!==tok)return;await chooseDesktop();if(my!==tok)return;await gate();if(my!==tok)return;$('cameraChoice').replaceChildren();phase='calibration';CAL=await calibrate();if(my!==tok||!CAL)return;if(!CAL.reliable){cue('もう一度<br>合わせます');await sleep(2200);if(my!==tok)return;const c2=await calibrate();if(my!==tok||!c2)return;if(c2.ok&&(!CAL.ok||c2.x.sep+c2.y.sep>CAL.x.sep+CAL.y.sep))CAL=c2;}if(!CAL.ok)throw Error('目の位置を読み取れませんでした。合わせからやり直してください');expose();await startRun();}catch(e){if(my!==tok)return;cue(e.message);btn('合わせからやり直す',begin);try{await chooseDesktop(false);}catch{}}}
+function target(t,direction,p=period){const local=Math.max(0,direction==='cw'?t:t-(2*p+1.5)*1000),angle=(direction==='cw'?-1:1)*TAU*local/(p*1000);return {angle,targetX:Math.cos(angle),targetY:Math.sin(angle)};}
+function trajectory(t){if(t<period*2000)return 'cw';if(t<(period*2+1.5)*1000)return null;if(t<(period*4+1.5)*1000)return 'ccw';return 'done';}
+async function startRun(){if(!demo&&!CAL?.ok)return;const my=++tok;if(!demo&&!camOK())await startCam();if(my!==tok)return;show('stage');dark(true);$('btns').replaceChildren();$('cameraChoice').replaceChildren();rows=[];period=Number($('seconds').value);phase='countdown';placeDot(1,0);for(const n of [3,2,1]){cue(String(n));await sleep(1000);if(my!==tok)return;}cue('');runStart=performance.now();phase='running';expose();requestAnimationFrame(runTick);}
+function runTick(now){if(phase!=='running')return;const t=now-runStart,d=trajectory(t);if(d==='done'){finish();return;}if(!d){cue('反対回り');placeDot(1,0);}else{cue('');const q=target(t,d);point={x:q.targetX,y:q.targetY};drawField(true);if(demo)capture(now,null,null);}requestAnimationFrame(runTick);}
+let missingSince=0;
+function capture(now,pts,bs){const t=now-runStart,direction=trajectory(t);if(!direction||direction==='done')return;const q=target(t,direction);rows.push({t,pts,bs,...q,direction,...(demo?{synthetic:synthetic(t,direction)}:{})});if(!demo&&!pts){missingSince||=now;$('faceWarning').textContent=now-missingSince>700?'顔が見えません':'';}else{missingSince=0;$('faceWarning').textContent='';}}
+function demoCal(){return {ok:true,reliable:true,apRef:.3,x:{nm:'hx',mc:0,slope:1,sep:12},y:{nm:'vy',mc:0,slope:1,sep:12}};}
+function synthetic(t,direction){const q=target(t-150,direction),i=sector(q.angle);let a=q.angle,r=i===1?.65:1;if(i===5)a=Math.round(a/.35)*.35;return {X:1.3*r*Math.cos(a)+.1+.005*Math.sin(t*.029),Y:1.1*r*Math.sin(a)-.08+.005*Math.cos(t*.023),bl:false};}
+function syntheticRecords(p=8){period=p;const a=[];for(let t=0;t<(4*p+1.5)*1000;t+=1000/60){const direction=trajectory(t);if(direction)a.push({t,pts:null,bs:null,direction,...target(t,direction),synthetic:synthetic(t,direction)});}return a;}
+// 右回り・左回りごとに、読み方と遅れを全探索する。
+function axisFit(v,a){const mv=mean(v),ma=mean(a),ss=mean(a.map(x=>(x-ma)**2)),A=ss?mean(a.map((x,i)=>(x-ma)*(v[i]-mv)))/ss:0,B=mv-A*ma;return {A,B,sse:v.reduce((s,x,i)=>s+(x-A*a[i]-B)**2,0),sst:v.reduce((s,x)=>s+(x-mv)**2,0)};}
+function pickCircle(fr,direction,p){let best=null;for(const cx of CAL.x.all||[CAL.x])for(const cy of CAL.y.all||[CAL.y]){const present=fr.filter(o=>o.pts||o.synthetic),values=present.map(o=>o.synthetic||series([o],cx,cy)[0]),valid=values.map((v,i)=>({...present[i],...v})).filter(v=>!v.bl&&Number.isFinite(v.X)&&Number.isFinite(v.Y));if(valid.length<20)continue;for(let lag=0;lag<=400;lag+=20){const q=valid.map(v=>target(v.t-lag,direction,p)),x=axisFit(valid.map(v=>v.X),q.map(v=>v.targetX)),y=axisFit(valid.map(v=>v.Y),q.map(v=>v.targetY)),r2=x.sst+y.sst?1-(x.sse+y.sse)/(x.sst+y.sst):0;if(!best||r2>best.r2)best={lag,r2,Ax:x.A,Bx:x.B,Ay:y.A,By:y.B,nm:cx.nm+'・'+cy.nm,values:new Map(present.map((o,i)=>[o,values[i]]))};}}return best;}
+function analyze(records,p=period){const trace=[],events=[],quality=[];let segment=0;for(const direction of ['cw','ccw']){const fr=records.filter(o=>o.direction===direction),fit=pickCircle(fr,direction,p),unread=!fit||fit.Ax<.35||fit.Ay<.35||fit.r2<.3;quality.push({direction,unread,...(fit?Object.fromEntries(Object.entries(fit).filter(([k])=>k!=='values')):{})});if(unread)continue;const raw=fr.map(o=>{const v=fit.values.get(o),q=target(o.t-fit.lag,direction,p),valid=!!v&&!v.bl&&Number.isFinite(v.X)&&Number.isFinite(v.Y);return {...o,...q,valid,x:valid?(v.X-fit.Bx)/Math.max(fit.Ax,.35):null,y:valid?(v.Y-fit.By)/Math.max(fit.Ay,.35):null};});let prev=null;for(const o of raw){if(!o.valid||!prev?.valid||o.t-prev.t>120||o.t<=prev.t)segment++;o.segment=segment;prev=o;}const sm=raw.map((o,i)=>{if(!o.valid)return o;const w=raw.slice(Math.max(0,i-1),i+2).filter(v=>v.valid&&v.segment===o.segment);return {...o,x:med(w.map(v=>v.x)),y:med(w.map(v=>v.y))};});const dx=[],dy=[];for(let i=1;i<raw.length;i++)if(raw[i].valid&&raw[i-1].valid&&raw[i].segment===raw[i-1].segment){dx.push(raw[i].x-raw[i-1].x);dy.push(raw[i].y-raw[i-1].y);}const noise=1.4826*Math.hypot(mad(dx),mad(dy)),angles=raw.filter(o=>o.valid).map(o=>wrap(o.angle-Math.atan2(o.y,o.x))*(direction==='cw'?-1:1)*180/Math.PI),base=med(angles);let event=null;const flush=()=>{if(event)events.push(event);event=null;};for(let i=0;i<sm.length;i++){const o=sm[i],a=sm[i-1];if(o.valid){const v=raw[i];o.reach=Math.hypot(v.x,v.y);o.lag=wrap(v.angle-Math.atan2(v.y,v.x))*(direction==='cw'?-1:1)*180/Math.PI-base;o.error=Math.hypot(v.x-v.targetX,v.y-v.targetY);}const move=a?Math.hypot(o.x-a.x,o.y-a.y):0,tm=a?Math.hypot(o.targetX-a.targetX,o.targetY-a.targetY):0,fast=a?.valid&&o.valid&&a.segment===o.segment&&move>Math.max(3*tm,.15,3*(noise||0));if(fast){if(!event)event={start:a,end:o,direction,sector:sector(o.angle)};else event.end=o;}else flush();}flush();trace.push(...sm);}const groups={};for(const d of ['cw','ccw','all'])groups[d]=names.map((name,i)=>{const a=trace.filter(o=>o.valid&&sector(o.angle)===i&&(d==='all'||o.direction===d));return {name,reach:a.length?med(a.map(o=>o.reach)):null,lag:a.length?med(a.map(o=>o.lag)):null,error:a.length?med(a.map(o=>o.error)):null,jumps:events.filter(e=>e.sector===i&&(d==='all'||e.direction===d)).length,frames:a.length};});return {trace,events,groups,quality};}
+const fmt=v=>Number.isFinite(v)?v.toFixed(2):'—';
+function hardText(groups){const a=groups.all.filter(r=>r.frames).map(r=>({...r,score:Math.max(0,1-r.reach)+r.jumps*.06+Math.max(0,r.lag)/180+r.error})).sort((a,b)=>b.score-a.score).slice(0,2);return a.length?'動きづらい方向：'+a.map(r=>`${r.name}（届き${fmt(r.reach)}・飛び${r.jumps}回）`).join('、'):'有効な記録がありません。合わせからやり直してください。';}
+function renderResult(data){current=data;period=data.period;rows=data.records||[];expose(data);show('result');$('preview').hidden=true;$('demoLabel').hidden=!data.demo;$('hard').textContent=data.hard;const bad=data.reference;$('quality').textContent=`見分け 横 ${fmt(data.calibration?.x?.sep)}・たて ${fmt(data.calibration?.y?.sep)} ／ 顔が読めたコマ ${fmt(data.faceRatio*100)}% ／ ${fmt(data.fps)} コマ/秒${bad?' ／ この回の結果は参考':''} ／ `+data.quality.map(q=>`${q.direction==='cw'?'右回り':'左回り'}：${q.unread?'この周はカメラで目の動きが小さくしか写らなかった':`${q.nm}・lag ${q.lag}ms・r2 ${fmt(q.r2)}`}`).join(' ／ ');$('again').disabled=!demo&&!CAL?.ok;$('csv').disabled=!rows.length;const host=$('tables');host.replaceChildren();for(const [key,label]of [['cw','右回り'],['ccw','左回り'],['all','合計']]){const table=document.createElement('table');table.innerHTML=`<caption>${label}</caption><thead><tr><th>方向</th><th>届き</th><th>遅れ°</th><th>飛び</th><th>ずれ</th></tr></thead><tbody>${data.groups[key].map(r=>`<tr><th>${r.name}</th><td>${r.reach!==null&&r.reach<.8?'<b style="color:#ff6b6b">'+fmt(r.reach)+'</b>':fmt(r.reach)}</td><td>${fmt(r.lag)}</td><td>${r.jumps}</td><td>${fmt(r.error)}</td></tr>`).join('')}</tbody>`;host.append(table);}drawResult(data);}
+function drawResult(data){const c=$('resultCanvas'),x=c.getContext('2d'),g={x:500,y:470,r:350};x.fillStyle='#070707';x.fillRect(0,0,c.width,c.height);x.fillStyle='#eee';x.font='24px system-ui';x.fillText('目の円トレース'+(data.demo?'（デモ）':''),35,40);for(let i=0;i<8;i++){const a=-i*TAU/8,e=data.groups.all[i].error,alpha=e===null?0:Math.min(.8,e);x.beginPath();x.arc(g.x,g.y,g.r+32,a-TAU/16,a+TAU/16);x.arc(g.x,g.y,g.r+8,a+TAU/16,a-TAU/16,true);x.closePath();x.fillStyle=`rgba(255,65,65,${alpha})`;x.fill();x.fillStyle='#eee';x.textAlign='center';x.fillText(names[i],g.x+Math.cos(a)*(g.r+64),g.y+Math.sin(a)*(g.r+64)+8);}x.textAlign='left';x.strokeStyle='#777';x.lineWidth=2;x.beginPath();x.arc(g.x,g.y,g.r,0,TAU);x.stroke();let prev=null;for(const r of data.trace){if(!r.valid){prev=null;continue;}if(prev&&prev.direction===r.direction&&prev.segment===r.segment){x.strokeStyle=r.direction==='cw'?'#57b8ff':'#ffa557';x.lineWidth=2;x.beginPath();x.moveTo(g.x+prev.x*g.r,g.y-prev.y*g.r);x.lineTo(g.x+r.x*g.r,g.y-r.y*g.r);x.stroke();}prev=r;}for(const e of data.events){const a={x:g.x+e.start.x*g.r,y:g.y-e.start.y*g.r},b={x:g.x+e.end.x*g.r,y:g.y-e.end.y*g.r},angle=Math.atan2(b.y-a.y,b.x-a.x);x.strokeStyle='#ff4545';x.fillStyle='#ff4545';x.lineWidth=3;x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke();x.beginPath();x.moveTo(b.x,b.y);x.lineTo(b.x-12*Math.cos(angle-.4),b.y-12*Math.sin(angle-.4));x.lineTo(b.x-12*Math.cos(angle+.4),b.y-12*Math.sin(angle+.4));x.closePath();x.fill();}x.font='19px system-ui';x.fillStyle='#57b8ff';x.fillText('青：右回り',35,925);x.fillStyle='#ffa557';x.fillText('橙：左回り',240,925);x.fillStyle='#ff4545';x.fillText('赤い矢印：飛び',450,925);x.fillStyle='#aaa';x.fillText('外周：ずれが大きい区画ほど赤',35,965);}
+
+function finish(){phase='result';hideDot();const a=analyze(rows),faceRatio=rows.length?rows.filter(r=>r.pts||r.synthetic).length/rows.length:0,data={v:3,date:new Date().toISOString(),demo,period,calibration:CAL,records:rows,...a,hard:hardText(a.groups),faceRatio,fps:rows.length/(period*4),reference:!CAL?.reliable||a.quality.some(q=>q.unread)||faceRatio<.8};renderResult(data);try{const {records,...summary}=data;summary.trace=a.trace.map(({x,y,valid,direction,segment})=>({x,y,valid,direction,segment}));summary.events=a.events.map(e=>({...e,start:{x:e.start.x,y:e.start.y},end:{x:e.end.x,y:e.end.y}}));history.unshift(summary);history=history.slice(0,20);localStorage.setItem('eye-circle-history-v3',JSON.stringify(history));renderHistory();}catch{$('quality').textContent+=' ／ 端末への保存ができませんでした';}}
+function renderHistory(){const h=$('history');h.replaceChildren();if(!history.length)h.textContent='まだ記録はありません';for(const d of history){const b=document.createElement('button');b.textContent=new Date(d.date).toLocaleString('ja-JP')+' '+d.hard;b.onclick=()=>renderResult(d);h.append(b);}}
+function cancel(){tok++;rec=null;phase='home';camWanted=false;releaseCam();wl?.release();camFixBtn(false);$('faceWarning').textContent='';show('home');dark(true);}
 function download(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
-$('start').onclick=begin;$('stop').onclick=cancel;$('back').onclick=cancel;$('again').onclick=startRun;$('recalibrate').onclick=begin;$('fullscreen').onclick=async()=>{try{await document.documentElement.requestFullscreen();}catch{$('loadState').textContent='この端末では全画面にできません';}};
-$('png').onclick=()=>$('resultCanvas').toBlob(b=>{if(b)download(b,'eye-circle.png');});$('csv').onclick=()=>{const keys=['t','direction','angle','targetX','targetY','X','Y','blink','head','headMoved','missing'];download(new Blob(['\uFEFF'+keys.join(',')+'\n'+rows.map(r=>keys.map(k=>r[k]??'').join(',')).join('\n')],{type:'text/csv;charset=utf-8'}),'eye-circle.csv');};
-async function load(){if(demo){$('loadState').textContent='デモの準備ができました（カメラなし・合成データ）';$('start').disabled=false;return;}const [{FilesetResolver,FaceLandmarker},model]=await Promise.all([import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/vision_bundle.mjs'),(async()=>{const r=await fetch(MODEL);if(!r.ok)throw Error('モデルの取得に失敗しました');const total=Number(r.headers.get('content-length')),reader=r.body?.getReader();if(!reader)return new Uint8Array(await r.arrayBuffer());let got=0;const chunks=[];for(;;){const {done,value}=await reader.read();if(done)break;chunks.push(value);got+=value.length;$('loadState').textContent=total?`モデル読み込み中… ${Math.min(99,Math.round(got/total*100))}%`:'モデル読み込み中…（取得サイズを確認中）';}const buffer=new Uint8Array(got);let offset=0;for(const c of chunks){buffer.set(c,offset);offset+=c.length;}return buffer;})()]);$('loadState').textContent='モデル読み込み 100%・顔の読み取りを準備中';const fs=await FilesetResolver.forVisionTasks(WASM),options=delegate=>({baseOptions:{modelAssetBuffer:model,delegate},runningMode:'VIDEO',numFaces:1,outputFaceBlendshapes:true,outputFacialTransformationMatrixes:true});try{lm=await FaceLandmarker.createFromOptions(fs,options('GPU'));}catch{lm=await FaceLandmarker.createFromOptions(fs,options('CPU'));}$('loadState').textContent='準備ができました';$('start').disabled=false;}
-function validHistory(d){const finite=Number.isFinite,nullable=v=>v===null||finite(v),trace=r=>r&&typeof r.valid==='boolean'&&['cw','ccw'].includes(r.direction)&&(!r.valid||(finite(r.x)&&finite(r.y)&&Number.isInteger(r.segment))),row=r=>r&&names.includes(r.name)&&['reach','lag','error'].every(k=>nullable(r[k]))&&Number.isInteger(r.jumps)&&r.jumps>=0&&Number.isInteger(r.frames)&&r.frames>=0;return !!d&&typeof d.date==='string'&&finite(Date.parse(d.date))&&typeof d.demo==='boolean'&&finite(d.period)&&d.period>0&&typeof d.hard==='string'&&finite(d.headRatio)&&d.headRatio>=0&&d.headRatio<=1&&Number.isInteger(d.validCount)&&d.validCount>=0&&(d.calibration===null||finite(d.calibration?.error))&&['cw','ccw','all'].every(k=>Array.isArray(d.groups?.[k])&&d.groups[k].length===names.length&&d.groups[k].every(row))&&Array.isArray(d.trace)&&d.trace.every(trace)&&Array.isArray(d.events)&&d.events.every(e=>e&&trace(e.start)&&trace(e.end)&&e.start.segment===e.end.segment);}
-try{history=JSON.parse(localStorage.getItem('eye-circle-history')||'[]');history=Array.isArray(history)?history.filter(validHistory):[];renderHistory();}catch{history=[];}load().catch(e=>{$('loadState').textContent='読み込みに失敗しました：'+e.message;});
-if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
-addEventListener('pagehide',()=>{stream?.getTracks().forEach(t=>t.stop());stream=null;latest=null;lastVideo=-1;});
+$('bStart').onclick=begin;$('stop').onclick=cancel;$('back').onclick=cancel;$('again').onclick=startRun;$('recalibrate').onclick=begin;$('fullscreen').onclick=async()=>{try{await document.documentElement.requestFullscreen();}catch{}};
+$('png').onclick=()=>$('resultCanvas').toBlob(b=>{if(b)download(b,'eye-circle.png');});
+$('csv').onclick=()=>{const keys=['t','direction','angle','targetX','targetY','pts','bs','synthetic'],quote=v=>'"'+JSON.stringify(v??null).replaceAll('"','""')+'"';download(new Blob(['\uFEFF'+keys.join(',')+'\n'+rows.map(r=>keys.map(k=>quote(r[k])).join(',')).join('\n')],{type:'text/csv;charset=utf-8'}),'eye-circle.csv');};
+function validHistory(d){const num=Number.isFinite,nullable=x=>x===null||num(x),row=r=>r&&names.includes(r.name)&&['reach','lag','error'].every(k=>nullable(r[k]))&&Number.isInteger(r.jumps)&&r.jumps>=0&&Number.isInteger(r.frames)&&r.frames>=0;return d?.v===3&&num(Date.parse(d.date))&&typeof d.demo==='boolean'&&typeof d.hard==='string'&&num(d.period)&&d.period>0&&num(d.faceRatio)&&num(d.fps)&&Array.isArray(d.trace)&&d.trace.every(r=>r&&typeof r.valid==='boolean'&&['cw','ccw'].includes(r.direction)&&(!r.valid||(num(r.x)&&num(r.y)&&Number.isInteger(r.segment))))&&Array.isArray(d.events)&&d.events.every(e=>e&&[e.start,e.end].every(r=>r&&num(r.x)&&num(r.y)))&&Array.isArray(d.quality)&&d.quality.every(q=>q&&typeof q.unread==='boolean'&&['cw','ccw'].includes(q.direction))&&['cw','ccw','all'].every(k=>Array.isArray(d.groups?.[k])&&d.groups[k].length===8&&d.groups[k].every(row));}
+try{const a=JSON.parse(localStorage.getItem('eye-circle-history-v3')||'[]');history=Array.isArray(a)?a.filter(validHistory).slice(0,20):[];}catch{history=[];}renderHistory();
+const note=document.createElement('p');note.className='muted';note.textContent='届きは全体の振れ幅を1にそろえた値です。「届いていない」は、ほかの向きより届いていないという意味です。遅れ°は、その周全体より遅れる角度です（＋が遅れ）。届きが赤いのは0.8未満＝届いていない向きです。左右は本人から見た向きです。';$('tables').before(note);
+expose();
+if(demo){$('bStart').disabled=false;$('loadState').textContent='デモの準備ができました（合成データ）';}else import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/vision_bundle.mjs').then(m=>{FilesetResolver=m.FilesetResolver;FaceLandmarker=m.FaceLandmarker;return load();}).catch(e=>{$('loadState').textContent='読み込みに失敗しました：'+e.message;});
+if(!demo&&!test&&'serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
 </script></body></html>
