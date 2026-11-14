@@ -1,13 +1,199 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#070707"><title>目の円トレース｜FNT</title><link rel="manifest" href="manifest.json"><link rel="icon" href="icons/favicon-32.png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><style>
-:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#070707;color:#eee}*{box-sizing:border-box}body{margin:0;background:#070707;color:#eee}main{max-width:1000px;margin:auto;padding:28px 20px}h1{font-size:clamp(26px,5vw,42px)}p{line-height:1.8}button,select{font:inherit;padding:12px 18px;border-radius:10px;border:1px solid #555;background:#191919;color:#eee;margin:5px;cursor:pointer}button.primary{background:#22c1a6;color:#070707;border:0;font-weight:bold}button:disabled{opacity:.4;cursor:wait}.muted{color:#aaa;font-size:14px}.warn{color:#ffb576}section[hidden],[hidden]{display:none!important}#stage{position:fixed;inset:0;background:#070707}#field{width:100%;height:100%;display:block}#cue{position:absolute;top:20px;left:16px;right:150px;pointer-events:none}#count{position:absolute;inset:0;display:grid;place-items:center;font-size:64px;pointer-events:none}#stop{position:absolute;right:16px;bottom:16px}#preview{position:fixed;top:12px;right:12px;width:120px;z-index:5}#preview.align{top:15%;left:50%;right:auto;width:min(360px,calc(100vw - 32px));transform:translateX(-50%)}#camSel{max-width:100%;width: min(320px,100%)}#video{width:100%;display:block;transform:scaleX(-1);border-radius:8px}#ecPreviewMarks{background:transparent!important;position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1)}#align{position:absolute;bottom:32px;left:16px;right:150px}#resultCanvas{width:100%;height:auto;background:#070707;border:1px solid #333;border-radius:12px}.tables{overflow-x:auto}table{width:100%;border-collapse:collapse;white-space:nowrap;margin:12px 0 28px}th,td{text-align:right;padding:10px;border-bottom:1px solid #333}th:first-child,td:first-child{text-align:left}caption{text-align:left;font-weight:bold}#history button{display:block;width:100%;text-align:left}#orientation{color:#aaa;font-size:13px}@media (orientation:landscape){#orientation{display:none}}
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#ffffff"><title>目の円トレース｜FNT</title><link rel="manifest" href="manifest.json"><link rel="icon" href="icons/favicon-32.png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* 骨格は pinto-8（FNT 標準）に合わせる。配色は白（2026-10-16 宮崎さん：最初は黒にしたが「黒だと画面に顔などが映り込む」ので白に）。文字とボタンは黒、差し色は測る線と同じ赤 */
+  :root{ --bg0:#fff; --bg1:#f6f6f7; --bg2:#ececee; --accent:#111113; --accent2:#2c2c30; --accentInk:#fff; --red:#d32020;
+    --ink:#111113; --muted:#5f5f66; --line:rgba(0,0,0,.12); --card:rgba(0,0,0,.04); --danger:#c0392b; }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ overflow-x:hidden; max-width:100%; }
+  body{ font-family:"M PLUS Rounded 1c", system-ui, sans-serif; font-weight:700; color:var(--ink); line-height:1.7;
+    background:var(--bg0);
+    min-height:100vh; min-height:100dvh;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  body.playing{ overflow:hidden; touch-action:none; }
+  button{ font-family:inherit; font-weight:700; cursor:pointer; border:none; }
+  a{ color:var(--accent); }
+  :focus-visible{ outline:3px solid var(--accent); outline-offset:3px; border-radius:8px; }
 
-main{max-width:680px;padding:20px 14px}button,select{font-size:18px}#stage{background:#000}#cue{left:50%;top:50%;right:auto;transform:translate(-50%,-50%);width:92%;text-align:center;font-size:clamp(23px,6.6vw,34px);font-weight:800;line-height:1.45;z-index:6}#cue:empty{display:none}#cue small{display:block;font-size:16px;margin-top:8px}#preview{top:12px;left:12px;right:auto;width:120px}#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}#video{object-fit:contain}#btns,#cameraChoice{position:absolute;bottom:70px;left:12px;right:12px;text-align:center;z-index:8}#cameraChoice{bottom:130px}#stop{font-size:14px;padding:8px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:9}#faceWarning{position:absolute;top:12px;left:0;right:0;text-align:center;font-size:14px;color:#ffb576}.meter{height:16px;background:#333;position:relative;margin:16px 8px;border-radius:8px;overflow:hidden}.meter i{position:absolute;top:0;bottom:0;background:#22c1a680}.meter b{position:absolute;top:0;bottom:0;width:6px;background:white}.ok{color:#22c1a6}#camFix{position:fixed;bottom:15%;left:5%;width:90%;z-index:20}#resultCanvas{aspect-ratio:1}td,th{padding:8px 5px;font-size:14px}
+  #splash{ position:fixed; inset:0; z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:32px;
+    background:var(--bg0); transition:opacity .45s ease, visibility .45s ease; }
+  #splash.hide{ opacity:0; visibility:hidden; pointer-events:none; }
+  #splash img{ width:132px; height:132px; margin-bottom:22px; border-radius:26px; }
+  #splash .fnt{ font-size:13px; letter-spacing:.24em; color:var(--muted); margin-bottom:14px; }
+  #splash h1{ font-size:34px; font-weight:800; color:var(--ink); letter-spacing:.04em; margin-bottom:10px; }
+  #splash h1::after{ content:""; display:block; width:44px; height:3px; margin:12px auto 0; border-radius:2px; background:var(--red); }
+  #splash .aboutLink{ margin-top:16px; font-size:14px; color:var(--muted); text-decoration:none; border-bottom:1px solid var(--line); padding-bottom:2px; }
+  #splash .lead{ font-size:14px; color:var(--muted); margin-bottom:30px; }
+  #splash .tapstart{ min-height:52px; padding:14px 34px; border-radius:16px; font-size:17px; font-weight:800; color:var(--accentInk);
+    background:linear-gradient(180deg,var(--accent),var(--accent2)); animation:breathe 2.4s ease-in-out infinite; }
+  #splash .copy{ position:absolute; bottom:calc(20px + env(safe-area-inset-bottom)); font-size:11px; color:var(--muted); }
+  @keyframes breathe{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.05); } }
+  .muteToggle{ margin-top:22px; min-height:40px; padding:8px 20px; border-radius:14px; font-size:13px; color:var(--accent); background:var(--card); border:1px solid var(--line); }
+  .muteToggle.off{ color:var(--muted); }
+
+  .app{ width:100%; max-width:480px; margin:0 auto; min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; }
+  header{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px 4px; }
+  .logo{ display:flex; align-items:center; gap:10px; }
+  .logo img{ width:34px; height:34px; }
+  .logo b{ font-size:15px; font-weight:800; }
+  .staffTag{ font-size:11px; color:var(--accentInk); background:var(--accent); border-radius:8px; padding:1px 8px; margin-left:4px; }
+  .menuBtn{ width:46px; height:46px; border-radius:12px; background:var(--card); color:var(--ink); font-size:22px; }
+  main{ flex:1; display:flex; flex-direction:column; padding:8px 20px 4px; }
+  .screen{ display:none; flex-direction:column; }
+  .screen.active{ display:flex; }
+  .step-label{ font-size:12px; letter-spacing:.16em; color:var(--red); margin-bottom:8px; }
+  h2{ font-size:23px; font-weight:800; line-height:1.5; margin-bottom:14px; }
+  .setupList{ list-style:none; margin:10px 0 18px; display:flex; flex-direction:column; gap:12px; }
+  .setupList li{ display:flex; gap:12px; align-items:flex-start; padding:14px 16px; border-radius:14px; background:var(--card); border:1px solid var(--line); font-size:15px; }
+  .setupList .no{ flex:none; width:26px; height:26px; border-radius:50%; background:var(--accent); color:var(--accentInk); font-weight:800; font-size:14px; display:flex; align-items:center; justify-content:center; }
+  .btn{ width:100%; min-height:56px; border-radius:16px; font-size:18px; font-weight:800; color:var(--accentInk); background:linear-gradient(180deg,var(--accent),var(--accent2)); margin-top:10px; }
+  a.btn{ display:flex; align-items:center; justify-content:center; text-decoration:none; }
+  .btn.sub{ background:var(--card); color:var(--ink); border:1px solid var(--line); font-size:16px; min-height:50px; }
+  .msg{ margin:12px 0; padding:14px 16px; border-radius:14px; background:rgba(192,57,43,.07); border:1px solid var(--danger); font-size:15px; display:none; }
+  .msg.show{ display:block; }
+  .res{ margin:10px 0; padding:14px 16px; border-radius:14px; background:var(--card); border:1px solid var(--line); font-size:15px; line-height:1.8; }
+  .res.judge{ border-color:var(--accent2); }
+  .small{ font-size:12px; color:var(--muted); font-weight:500; line-height:1.7; display:inline-block; margin-top:6px; }
+  .done{ font-size:22px; font-weight:800; text-align:center; margin:30px 0 10px; }
+  textarea{ width:100%; height:120px; margin-top:8px; border-radius:12px; background:#f4f4f5; color:var(--ink); border:1px solid var(--line); padding:10px; font-size:12px; font-family:ui-monospace,monospace; }
+
+  /* 測る画面：真っ白に赤い線だけ（黒だと画面に顔が映り込むので白。2026-10-16 宮崎さん） */
+  #svv{ position:fixed; inset:0; display:none; z-index:300; background:#fff; }
+  #svv canvas{ position:absolute; inset:0; width:100%; height:100%; }
+  #svvMsg{ position:absolute; left:50%; top:18%; transform:translateX(-50%); width:min(92vw,520px); text-align:center; font-weight:800; font-size:clamp(22px,6vw,30px); line-height:1.45; color:#222; }
+  #svvMsg small{ display:block; font-size:15px; font-weight:600; color:#666; margin-top:6px; }
+  body[data-col=white] #svv{ background:#000; } body[data-col=white] #svvMsg{ color:#eee; } body[data-col=white] #svvMsg small{ color:#aaa; }
+  body[data-col=white] #svvStop{ background:#1a1a1c; color:#888; border-color:#333; }
+  .colPick{ display:flex; gap:8px; margin:14px 0 4px; } .colPick button{ flex:1; min-height:46px; border-radius:12px; background:var(--card); color:var(--ink); border:1px solid var(--line); font-size:14px; }
+  .colPick button.on{ background:var(--accent); color:var(--accentInk); border-color:var(--accent); }
+  #svvStop{ position:absolute; right:calc(14px + env(safe-area-inset-right)); bottom:calc(14px + env(safe-area-inset-bottom)); padding:8px 14px; border-radius:10px; background:#f2f2f3; color:#888; font-size:13px; border:1px solid #e2e2e4; }
+
+  /* 首の傾きチェック：前のカメラで顔を映す（SVV の前にやる。2026-10-24） */
+  #tilt{ position:fixed; inset:0; display:none; z-index:310; background:#000; }
+  #tilt video{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; transform:scaleX(-1); }
+  #tiltO{ position:absolute; inset:0; width:100%; height:100%; }
+  #tiltBtns{ position:absolute; left:50%; bottom:calc(64px + env(safe-area-inset-bottom)); transform:translateX(-50%); width:min(86vw,420px); }
+  #tiltBtns button{ display:block; width:100%; margin:6px 0; font:inherit; font-size:18px; font-weight:800; padding:15px; border-radius:999px; border:0; background:#fff; color:#111; }
+  #tiltBtns button.sub{ background:transparent; color:#fff; border:1px solid rgba(255,255,255,.5); }
+  #tiltBtns button:disabled{ opacity:.4; }
+  #tiltMsg{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(92vw,520px); text-align:center; font-weight:800; font-size:clamp(22px,6vw,30px); line-height:1.45; color:#fff; padding:14px 16px; border-radius:18px; background:rgba(0,0,0,.6); }
+  #tiltMsg:empty{ display:none; }
+  #tiltMsg.low{ top:22%; }
+  #tilt:has(#tiltMsg.res){ background:#111; }
+  #tiltMsg.res{ top:38%; }
+  #tiltMsg small{ display:block; font-size:15px; font-weight:600; color:#ddd; margin-top:6px; }
+  #tiltStop{ position:absolute; right:calc(14px + env(safe-area-inset-right)); bottom:calc(14px + env(safe-area-inset-bottom)); padding:8px 14px; border-radius:10px; background:rgba(0,0,0,.55); color:#ddd; font-size:13px; border:1px solid rgba(255,255,255,.3); }
+
+  footer{ padding:20px 20px calc(20px + env(safe-area-inset-bottom)); text-align:center; }
+  .med{ font-size:11.5px; color:var(--muted); line-height:1.75; }
+  .fnt-copy{ display:block; margin-top:14px; font-size:11px; letter-spacing:.14em; color:var(--muted); opacity:.8; }
+
+  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.55); opacity:0; visibility:hidden; transition:opacity .3s ease, visibility .3s ease; z-index:80; }
+  .overlay.open{ opacity:1; visibility:visible; }
+  .side{ position:fixed; top:0; right:0; height:100%; width:min(84%,340px); z-index:90; background:var(--bg1); border-left:1px solid var(--line);
+    transform:translateX(100%); transition:transform .3s ease; display:flex; flex-direction:column;
+    padding:calc(16px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom)); overflow-y:auto; }
+  .side.open{ transform:translateX(0); }
+  .side .top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+  .side .top b{ font-size:16px; font-weight:800; }
+  .side .closeBtn{ width:44px; height:44px; border-radius:12px; background:var(--card); color:var(--ink); font-size:20px; }
+  .side h4{ font-size:12px; letter-spacing:.14em; color:var(--red); margin:18px 0 10px; }
+  .side a.sideBtn{ display:flex; align-items:center; justify-content:center; text-decoration:none; }
+  .side .box{ font-size:13px; color:var(--muted); line-height:1.95; }
+  .side .box ol{ padding-left:20px; }
+  .side .sideBtn{ width:100%; min-height:46px; border-radius:12px; background:var(--card); color:var(--ink); border:1px solid var(--line); font-size:14px; margin-top:8px; }
+  .side .learn{ margin-top:auto; padding-top:22px; }
+  .side .learn a{ font-size:14px; text-decoration:none; display:block; padding:12px 0; }
+  .side .side-copy{ font-size:10.5px; letter-spacing:.1em; color:var(--muted); opacity:.7; margin-top:14px; display:block; }
+  .hide{ display:none !important; }
+  @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+
+/* 既存の計測画面：配置・黒背景を維持 */
+#stage{position:fixed;inset:0;background:#070707}
+#field{width:100%;height:100%;display:block}
+#cue{position:absolute;top:20px;left:16px;right:150px;pointer-events:none}
+#count{position:absolute;inset:0;display:grid;place-items:center;font-size:64px;pointer-events:none}
+#stop{position:absolute;right:16px;bottom:16px}
+#preview{position:fixed;top:12px;right:12px;width:120px;z-index:5}
+#preview.align{top:15%;left:50%;right:auto;width:min(360px,calc(100vw - 32px));transform:translateX(-50%)}
+#camSel{max-width:100%;width: min(320px,100%)}
+#video{width:100%;display:block;transform:scaleX(-1);border-radius:8px}
+#ecPreviewMarks{background:transparent!important;position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1)}
+#align{position:absolute;bottom:32px;left:16px;right:150px}
+#stage{background:#000}
+#cue{left:50%;top:50%;right:auto;transform:translate(-50%,-50%);width:92%;text-align:center;font-size:clamp(23px,6.6vw,34px);font-weight:800;line-height:1.45;z-index:6}
+#cue:empty{display:none}
+#cue small{display:block;font-size:16px;margin-top:8px}
+#preview{top:12px;left:12px;right:auto;width:120px}
+#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#video{object-fit:contain}
+#btns,#cameraChoice{position:absolute;bottom:70px;left:12px;right:12px;text-align:center;z-index:8}
+#cameraChoice{bottom:130px}
+#stop{font-size:14px;padding:8px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:9}
+#faceWarning{position:absolute;top:12px;left:0;right:0;text-align:center;font-size:14px;color:#ffb576}
+.meter{height:16px;background:#333;position:relative;margin:16px 8px;border-radius:8px;overflow:hidden}
+.meter i{position:absolute;top:0;bottom:0;background:#22c1a680}
+.meter b{position:absolute;top:0;bottom:0;width:6px;background:white}
+.ok{color:#22c1a6}
+#camFix{position:fixed;bottom:15%;left:5%;width:90%;z-index:20}
+[hidden]{display:none!important}
+button:disabled{opacity:.4;cursor:wait}
+#home,#result{gap:0;min-width:0}
+#home h1,#result h1{font-size:23px;font-weight:800;line-height:1.5;margin-bottom:14px}
+select{font:inherit;color:var(--ink);background:var(--bg0);border:1px solid var(--line);border-radius:12px;padding:10px 14px;max-width:100%}
+.period{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.muted{font-size:12px;color:var(--muted);font-weight:500;line-height:1.7;margin:10px 0;overflow-wrap:anywhere}
+.warn{color:var(--red);font-size:14px;margin-bottom:14px}
+#loadState{font-size:13px;color:var(--muted);margin-top:14px}
+#resultCanvas{display:block;width:100%;height:auto;aspect-ratio:1;background:#070707;border:1px solid var(--line);border-radius:14px}
+#hard{margin:10px 0;padding:14px 16px;border-radius:14px;background:var(--card);border:1px solid var(--line);font-size:15px;line-height:1.8}
+.tables{width:100%;min-width:0}
+.tables b{color:var(--red)!important}
+table{width:100%;table-layout:fixed;border-collapse:collapse;margin:12px 0 28px;font-size:14px;font-variant-numeric:tabular-nums}
+caption{text-align:left;font-size:15px;font-weight:800;margin-bottom:8px}
+th,td{text-align:right;padding:10px 3px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+th:first-child,td:first-child{text-align:left}
+#history button{display:block;width:100%;text-align:left;min-height:46px;padding:12px;border-radius:12px;background:var(--card);color:var(--ink);border:1px solid var(--line);font-size:13px;line-height:1.8;margin-top:8px;overflow-wrap:anywhere}
+#stage{z-index:300;color:#eee}
+#stage button,#camFix{font:inherit;padding:12px 18px;border-radius:10px;border:1px solid #555;background:#191919;color:#eee;margin:5px}
+#stage button.primary{background:#22c1a6;color:#070707;border:0;font-weight:bold}
+#stage select{font-size:18px;background:#191919;color:#eee;border-color:#555}
+#stage #stop{font-size:14px;padding:8px}
+#preview{z-index:305}
+#camFix{z-index:320}
 </style></head><body>
-<main id="home"><h1>目の円トレース</h1><p>スマホを手に持ち、顔の正面に<br>頭とスマホは動かさず、目だけで点を追う<br>明るい部屋で。眼鏡の反射に注意</p><label>1周の秒数 <select id="seconds"><option>6</option><option selected>8</option><option>12</option></select></label><p>右回り2周 → 左回り2周</p><button id="bStart" class="primary" disabled>始める</button><button id="fullscreen">全画面</button><p id="loadState" role="status">読み込み中… 0%</p><h2>前回の結果</h2><div id="history"></div><p class="muted">これは医療の検査ではありません。カメラの映像は端末の中だけで処理し、送信しません。</p></main>
+<div id="splash" aria-label="目の円トレースを開始">
+  <img src="FNT512.png" alt="FNT ロゴ">
+  <div class="fnt">FUNCTIONAL NEURO TRAINING</div>
+  <h1>目の円トレース</h1>
+  <p class="lead">円を動く点を目で追い、目が跳ぶ・届かない方向を見つけます</p>
+  <button class="tapstart" id="tapStart">タップで開始</button>
+  <div class="copy">© Functional Neuro Training / Legrandchariot</div>
+</div>
+<div class="app" id="app" aria-hidden="true" inert>
+<header><div class="logo"><img src="FNT512-transparent.png" alt=""><b>目の円トレース</b></div><button class="menuBtn" id="menuBtn" aria-label="メニューを開く" aria-controls="side" aria-expanded="false">☰</button></header>
+<main id="home">
+<div class="step-label">円を追う目の動き</div><h1>目の円トレース</h1>
+<ul class="setupList">
+<li><span class="no">1</span><span>スマホを手に持ち、顔の正面に</span></li>
+<li><span class="no">2</span><span>頭とスマホは動かさず、目だけで点を追う</span></li>
+<li><span class="no">3</span><span>明るい部屋で。眼鏡の反射に注意</span></li>
+</ul>
+<label class="res period" for="seconds">1周の秒数 <select id="seconds"><option>6</option><option selected>8</option><option>12</option></select></label>
+<p class="small">右回り2周 → 左回り2周</p>
+<button id="bStart" class="btn primary" disabled>始める</button><button id="fullscreen" class="btn sub">全画面</button><p id="loadState" role="status">読み込み中… 0%</p></main>
+<main id="result" hidden><h1>結果</h1><p id="demoLabel" class="warn" hidden>デモ：合成データによる表示です。</p><canvas id="resultCanvas" width="1000" height="1000"></canvas><p id="hard"></p><p id="quality" class="muted"></p><div id="tables" class="tables"></div><button id="png" class="btn sub">画像で保存</button><button id="csv" class="btn sub">CSV で保存</button><button id="again" class="btn primary">もう一度</button><button id="recalibrate" class="btn sub">合わせからやり直す</button><button id="back" class="btn sub">トップへ</button></main>
+<footer><p class="med">これは医療の検査ではありません。カメラの映像は端末の中だけで処理し、送信しません。</p><span class="fnt-copy">© Functional Neuro Training / Legrandchariot</span></footer></div>
+<div class="overlay" id="menuOverlay"></div>
+<aside class="side" id="side" aria-label="メニュー" aria-hidden="true" inert>
+<div class="top"><b>メニュー</b><button class="closeBtn" id="closeMenu" aria-label="メニューを閉じる">×</button></div>
+<h4>このテストについて</h4><div class="box"><p>円を追う目の動きを見ます。</p><p>「跳ぶ」＝点に追いつけず、目が飛んで追いつくこと。</p><p>「届かない」＝その方向へ目が動きにくいこと。</p><p>精度は粗めで、医療の検査ではありません。映像は端末の中だけで処理し、端末の外へ送りません。</p></div>
+<h4>前回の結果</h4><div id="history" class="box"></div>
+<span class="side-copy">© Functional Neuro Training / Legrandchariot</span></aside>
 <section id="stage" hidden><canvas id="field"></canvas><div id="faceWarning"></div><div id="cue" role="status"></div><div id="count"></div><div id="btns"></div><div id="cameraChoice"></div><button id="stop">中止</button></section>
 <div id="preview" hidden><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
-<main id="result" hidden><h1>結果</h1><p id="demoLabel" class="warn" hidden>デモ：合成データによる表示です。</p><canvas id="resultCanvas" width="1000" height="1000"></canvas><p id="hard"></p><p id="quality" class="muted"></p><div id="tables" class="tables"></div><button id="png">画像で保存</button><button id="csv">CSV で保存</button><button id="again" class="primary">もう一度</button><button id="recalibrate">合わせからやり直す</button><button id="back">トップへ</button></main>
 <script type="module">
 
 const $ = id => document.getElementById(id);
@@ -355,5 +541,19 @@ const note=document.createElement('p');note.className='muted';note.textContent='
 expose();
 if(demo){$('bStart').disabled=false;$('loadState').textContent='デモの準備ができました（合成データ）';}else import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/vision_bundle.mjs').then(m=>{FilesetResolver=m.FilesetResolver;FaceLandmarker=m.FaceLandmarker;return load();}).catch(e=>{$('loadState').textContent='読み込みに失敗しました：'+e.message;});
 if(!demo&&!test&&'serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+
+// 表示だけの操作。計測・判定・保存の処理は変更しない。
+function openApp(){ $('splash').classList.add('hide'); $('app').inert=false; $('app').setAttribute('aria-hidden','false'); }
+$('tapStart').onclick=()=>{openApp();$('menuBtn').focus();};
+function menu(open){$('side').classList.toggle('open',open);$('menuOverlay').classList.toggle('open',open);$('side').inert=!open;$('side').setAttribute('aria-hidden',String(!open));$('menuBtn').setAttribute('aria-expanded',String(open));if(open)$('closeMenu').focus();else $('menuBtn').focus();}
+$('menuBtn').onclick=()=>menu(true);$('closeMenu').onclick=()=>menu(false);$('menuOverlay').onclick=()=>menu(false);
+addEventListener('keydown',e=>{if(e.key==='Escape'&&$('side').classList.contains('open'))menu(false);});
+$('history').addEventListener('click',e=>{if(e.target.closest('button'))menu(false);});
+// デモは既存の合成データと計算で結果を表示する。履歴には追加しない。
+if(demo){
+  openApp(); CAL=demoCal(); const records=syntheticRecords(Number($('seconds').value)),a=analyze(records);
+  renderResult({v:3,date:new Date().toISOString(),demo:true,period,calibration:CAL,records,...a,hard:hardText(a.groups),faceRatio:1,fps:records.length/(period*4),reference:false});
+}
 
 </script></body></html>
