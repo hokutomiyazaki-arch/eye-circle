@@ -1,4 +1,4 @@
-const CACHE='eye-circle-v5';
+const CACHE='eye-circle-v6';
 const FILES=['./FNT512.png','./FNT512-transparent.png','./','./index.html','./manifest.json','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png','./icons/favicon-32.png','./icons/apple-touch-icon.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)));});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('eye-circle-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()));});
