@@ -201,6 +201,7 @@ textarea{background:var(--bg1)}
   #splash .lead{margin-bottom:16px}
   #splash .copy{position:static;margin-top:20px}
 }
+.eye-difference{background:color-mix(in srgb,var(--bad) 18%,transparent)}
 </style></head><body>
 <div id="splash" aria-label="目の円トレースを開始">
   <img src="FNT512.png" alt="FNT ロゴ">
@@ -222,13 +223,13 @@ textarea{background:var(--bg1)}
 </ul>
 <label class="res period" for="seconds">1周の秒数 <select id="seconds"><option>6</option><option selected>8</option><option>12</option></select></label>
 <p class="small">右回り2周 → 左回り2周</p>
-<button id="bStart" class="btn primary" disabled>始める</button><button id="fullscreen" class="btn sub">全画面</button><p id="loadState" role="status">読み込み中… 0%</p></main>
+<button id="bStart" class="btn primary" disabled>右目 → 左目を続けて測る（推奨）</button><button id="startRight" class="btn sub" disabled>右目だけ</button><button id="startLeft" class="btn sub" disabled>左目だけ</button><button id="startBoth" class="btn sub" disabled>両目いっしょに（前の測り方）</button><button id="fullscreen" class="btn sub">全画面</button><p id="loadState" role="status">読み込み中… 0%</p></main>
 <main id="result" hidden><h1>結果</h1><p id="demoLabel" class="warn" hidden>デモ：合成データによる表示です。</p><canvas id="resultCanvas" width="1000" height="1000"></canvas><p id="hard"></p><p id="quality" class="muted"></p><div id="tables" class="tables"></div><button id="png" class="btn sub">画像で保存</button><button id="csv" class="btn sub">CSV で保存</button><button id="again" class="btn primary">もう一度</button><button id="recalibrate" class="btn sub">合わせからやり直す</button><button id="back" class="btn sub">トップへ</button></main>
 <footer><p class="med">これは医療の検査ではありません。カメラの映像は端末の中だけで処理し、送信しません。</p><span class="fnt-copy">© Functional Neuro Training / Legrandchariot</span></footer></div>
 <div class="overlay" id="menuOverlay"></div>
 <aside class="side" id="side" aria-label="メニュー" aria-hidden="true" inert>
 <div class="top"><b>メニュー</b><button class="closeBtn" id="closeMenu" aria-label="メニューを閉じる">×</button></div>
-<h4>このテストについて</h4><div class="box"><p>円を追う目の動きを見ます。</p><p>「跳ぶ」＝点に追いつけず、目が飛んで追いつくこと。</p><p>「届かない」＝その方向へ目が動きにくいこと。</p><p>精度は粗めで、医療の検査ではありません。映像は端末の中だけで処理し、端末の外へ送りません。</p></div>
+<h4>このテストについて</h4><div class="box"><p>円を追う目の動きを見ます。</p><p>片目ずつ測るとスマホのまん中が測る目の正面に来るので、その目から見て上下左右が同じ角度になり、左右の目の差も分かります。隠す手は目のところだけにしてください（顔全体を覆うと顔を読めません）。</p><p>「跳ぶ」＝点に追いつけず、目が飛んで追いつくこと。</p><p>「届かない」＝その方向へ目が動きにくいこと。</p><p>精度は粗めで、医療の検査ではありません。映像は端末の中だけで処理し、端末の外へ送りません。</p></div>
 <h4>前回の結果</h4><div id="history" class="box"></div>
 <span class="side-copy">© Functional Neuro Training / Legrandchariot</span></aside>
 <section id="stage" hidden><canvas id="field"></canvas><div id="faceWarning"></div><div id="cue" role="status"></div><div id="count"></div><div id="btns"></div><div id="cameraChoice"></div><button id="stop">中止</button></section>
@@ -241,6 +242,12 @@ const mobile=/iPhone|iPad|Android/i.test(navigator.userAgent)||navigator.maxTouc
 const video=$('video'),ov=$('overlay'),oc=ov.getContext('2d');
 let FilesetResolver,FaceLandmarker;
 const WASM='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/wasm',MODEL='https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+let measuredEye='both', sessionMode='both', pairedResults=[];
+let calibratedEye=null;
+const eyeLabel=e=>e==='right'?'右目':e==='left'?'左目':'両目';
+const missingFace=()=>measuredEye==='both'?'顔が見えません':'隠している手が大きいかもしれません。目のところだけを覆ってください';
+function readyStarts(){for(const id of ['bStart','startRight','startLeft','startBoth'])$(id).disabled=false;}
+function eyeCentered(pts){return measuredEye==='both'||Math.abs(pts[P.iris[measuredEye==='right'?0:1]].x/video.videoWidth-.5)<=.12;}
 let lm=null,last=null,lastBs=null,lastT=-1,rec=null,grab=null,tok=0,RUN={},phase='home',rows=[],current=null,period=8,runStart=0,point=null,history=[],selectedCamera=null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const TAU=2*Math.PI,names=['右','右上','上','左上','左','左下','下','右下'];
@@ -274,7 +281,7 @@ async function load() {
   toCPU = async () => { if (delegate === 'CPU' || switching) return; switching = true; try { lm = await FaceLandmarker.createFromOptions(fs, opt('CPU')); delegate = 'CPU'; } finally { switching = false; } };
   window.__lm = lm;
   $('loadState').textContent = '準備ができました。';
-  $('bStart').disabled = false; pickSync();
+  readyStarts(); pickSync();
 }
 function px(l) { return { x: l.x * video.videoWidth, y: l.y * video.videoHeight }; }
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -303,7 +310,7 @@ function frame(pts, E = P.eyeOut) {
   return { f, inv, d, ang, c };
 }
 // 目の大きさ（目じり〜目がしらの長さ）を、映像の短い辺で割った値。スマホを顔に近づけるほど大きくなる
-const eyeSize = pts => (dist(pts[P.eyeOut[0]], pts[P.eyeIn[0]]) + dist(pts[P.eyeOut[1]], pts[P.eyeIn[1]])) / 2 / Math.min(video.videoWidth, video.videoHeight);
+const eyeSize = pts => measuredEye!=='both' ? dist(pts[P.eyeOut[measuredEye==='right'?0:1]],pts[P.eyeIn[measuredEye==='right'?0:1]])/Math.min(video.videoWidth,video.videoHeight) : (dist(pts[P.eyeOut[0]], pts[P.eyeIn[0]]) + dist(pts[P.eyeOut[1]], pts[P.eyeIn[1]])) / 2 / Math.min(video.videoWidth, video.videoHeight);
 const EYE_OK = [0.17, 0.22];   // OK とする目の大きさ。11/14「もっと近づけて」で上げた。11/15 実測：顔が画面からはみ出しても 0.22（顔幅が画面の1.14倍）までは黒目の位置が変わらず、0.23 を超えると黒目の位置がずれ始め、0.26 で顔を見失う
 const EYE_MAX = 0.23;          // これを超えると、顔は見つかっていても黒目の位置が狂う
 
@@ -442,18 +449,18 @@ async function gate() {
   const sk = btn('この近さのまま進む', () => { skipped = true; }, 'sub'); sk.style.display = 'none';
   while (my === tok && !done && !skipped) {
     let html;
-    if (!last) html = '顔が見えません<small>スマホを顔の正面に持ってください</small>';
+    if (!last) {ok=0;html = missingFace()+'<small>スマホを測る目の正面に持ってください</small>';}
     else {
-      const v = eyeSize(last), good = v >= EYE_OK[0] && v <= EYE_OK[1];
+      const v = eyeSize(last), centered=eyeCentered(last), good = v >= EYE_OK[0] && v <= EYE_OK[1] && centered;
       const lo = 0.06, hi = 0.30, pos = clamp((v - lo) / (hi - lo), 0, 1) * 100;
       const zone = `<div class="meter"><i style="left:${(EYE_OK[0] - lo) / (hi - lo) * 100}%;width:${(EYE_OK[1] - EYE_OK[0]) / (hi - lo) * 100}%"></i><b style="left:${pos}%"></b></div>`;
-      html = (good ? '<span class="ok">OK ✓</span><br>この近さのまま' : v < EYE_OK[0] ? 'スマホを<br>顔に近づけて' : '少し<br>離して') + zone +
+      html = (!centered ? 'スマホをもう少し'+(last[P.iris[measuredEye==='right'?0:1]].x/video.videoWidth<.5?'右':'左')+'へ' : good ? '<span class="ok">OK ✓</span><br>この近さのまま' : v < EYE_OK[0] ? 'スマホを<br>顔に近づけて' : '少し<br>離して') + zone +
         '<small>白い線が金色の帯に入ればOK</small>';
       ok = good ? ok + 1 : 0;
       if (ok >= 7) done = true;      // 150ms × 7 ≒ 1秒、続けて OK
     }
     cue(html);
-    sk.style.display = !done && last && eyeSize(last) >= EYE_OK[0] && eyeSize(last) <= EYE_MAX && performance.now() - t0 > 7000 ? '' : 'none';   // 7秒で逃げ道を出す。ただし遠いままは進ませない（近すぎて合わないときだけ）
+    sk.style.display = !done && last && eyeCentered(last) && eyeSize(last) >= EYE_OK[0] && eyeSize(last) <= EYE_MAX && performance.now() - t0 > 7000 ? '' : 'none';   // 7秒で逃げ道を出す。ただし遠いままは進ませない（近すぎて合わないときだけ）
     await sleep(150);
   }
   sk.remove();
@@ -462,6 +469,15 @@ async function gate() {
 }
 // 1コマから目の特徴を取る。右目（s=0）・左目（s=1）は本人の向き
 function eyeFeat(pts) {
+  if (measuredEye !== 'both') {
+    const s = measuredEye === 'right' ? 0 : 1;
+    const { f } = frame(pts, [P.eyeOut[s], P.eyeIn[s]]), o = {};
+    const a = f(pts[P.eyeOut[s]]), b = f(pts[P.eyeIn[s]]), c = f(pts[P.iris[s]]), w = dist(a, b), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    o['hx' + s] = (c.x - m.x) / w;
+    o['vy' + s] = (c.y - m.y) / w;
+    o['ap' + s] = (f(pts[P.lidDn[s]]).y - f(pts[P.lidUp[s]]).y) / w;
+    return o;
+  }
   const { f } = frame(pts), o = {};
   for (const s of [0, 1]) {
     const a = f(pts[P.eyeOut[s]]), b = f(pts[P.eyeIn[s]]), c = f(pts[P.iris[s]]), w = dist(a, b), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
@@ -473,6 +489,7 @@ function eyeFeat(pts) {
 }
 function feats({ pts, bs }) {
   const e = eyeFeat(pts), b = k => (bs && Number.isFinite(bs[k])) ? bs[k] : NaN;
+  if(measuredEye!=='both'){const side=measuredEye==='right'?'Right':'Left',i=measuredEye==='right'?0:1;return {hx:-e['hx'+i],vy:-e['vy'+i],ap:e['ap'+i],bsX:measuredEye==='right'?b('eyeLookOutRight')-b('eyeLookInRight'):b('eyeLookInLeft')-b('eyeLookOutLeft'),bsY:b('eyeLookUp'+side)-b('eyeLookDown'+side),blinkBs:b('eyeBlink'+side),e};}
   return {
     hx: -(e.hx0 + e.hx1) / 2,                                                                                      // ＋＝本人の右を見る
     bsX: (b('eyeLookOutRight') + b('eyeLookInLeft') - b('eyeLookInRight') - b('eyeLookOutLeft')) / 2,
@@ -549,15 +566,17 @@ function drawField(circle=phase==='running'||phase==='countdown'){const c=$('fie
 addEventListener('resize',resize);resize();
 function expose(a){if(test)window.__ec={records:rows,rec:rows,calibration:CAL,CAL,analyze,series,syntheticRecords,result:a||current};}
 async function chooseDesktop(autoStart=true){if(mobile)return;const devices=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'),real=devices.filter(d=>!/virtual|obs|scanner|snap camera|mmhmm|ndi|manycam|xsplit/i.test(d.label));let saved;try{saved=localStorage.getItem('eyeCircleCamera');}catch{}const preferred=real.find(d=>d.deviceId===saved)||real.find(d=>/macbook|facetime|内蔵|built-?in|integrated/i.test(d.label))||real[0];if(autoStart&&preferred&&preferred.deviceId!==video.srcObject?.getVideoTracks()[0]?.getSettings().deviceId){selectedCamera=preferred.deviceId;await startCam();}const sel=document.createElement('select');sel.setAttribute('aria-label','カメラ');for(const d of devices){const o=new Option(d.label||'カメラ',d.deviceId);o.selected=d.deviceId===selectedCamera;sel.add(o);}sel.onchange=async()=>{selectedCamera=sel.value;try{await startCam();if(selectedCamera)localStorage.setItem('eyeCircleCamera',selectedCamera);}catch(e){cue('カメラを切り替えられません：'+e.message);}};$('cameraChoice').replaceChildren(sel);}
-async function begin(){const my=++tok;show('stage');$('btns').replaceChildren();try{if(demo){CAL=demoCal();await startRun();return;}phase='gate';await startCam();if(my!==tok)return;await chooseDesktop();if(my!==tok)return;await gate();if(my!==tok)return;$('cameraChoice').replaceChildren();phase='calibration';CAL=await calibrate();if(my!==tok||!CAL)return;if(!CAL.reliable){cue('もう一度<br>合わせます');await sleep(2200);if(my!==tok)return;const c2=await calibrate();if(my!==tok||!c2)return;if(c2.ok&&(!CAL.ok||c2.x.sep+c2.y.sep>CAL.x.sep+CAL.y.sep))CAL=c2;}if(!CAL.ok)throw Error('目の位置を読み取れませんでした。合わせからやり直してください');expose();await startRun();}catch(e){if(my!==tok)return;cue(e.message);btn('合わせからやり直す',begin);try{await chooseDesktop(false);}catch{}}}
+async function eyeGuide(){if(measuredEye==='both')return;phase='guide';dark(true);const other=measuredEye==='right'?'左目':'右目';cue(`${pairedResults.length?'次は左目。右目を隠して、スマホを左目の正面に<br>':''}${other}を隠します。手のひらを丸めて、${other}のところだけを覆ってください（顔全体は覆わない）。眼帯があれば眼帯で<small>スマホの画面のまん中を、${eyeLabel(measuredEye)}の正面に構えます</small>`);if(demo){await sleep(1500);return;}await new Promise(resolve=>{const b=btn('準備できました。近さを合わせる',()=>{b.remove();resolve();},'primary');});}
+function startSession(mode){sessionMode=mode;pairedResults=[];measuredEye=mode==='pair'?'right':mode;begin();}
+async function begin(){const my=++tok;show('stage');$('btns').replaceChildren();try{await eyeGuide();if(my!==tok)return;if(demo){CAL=demoCal();calibratedEye=measuredEye;await startRun();return;}phase='gate';await startCam();if(my!==tok)return;await chooseDesktop();if(my!==tok)return;await gate();if(my!==tok)return;$('cameraChoice').replaceChildren();phase='calibration';CAL=await calibrate();if(my!==tok||!CAL)return;if(!CAL.reliable){cue('もう一度<br>合わせます');await sleep(2200);if(my!==tok)return;const c2=await calibrate();if(my!==tok||!c2)return;if(c2.ok&&(!CAL.ok||c2.x.sep+c2.y.sep>CAL.x.sep+CAL.y.sep))CAL=c2;}if(!CAL.ok)throw Error('目の位置を読み取れませんでした。合わせからやり直してください');calibratedEye=measuredEye;expose();await startRun();}catch(e){if(my!==tok)return;cue(e.message);btn('合わせからやり直す',begin);try{await chooseDesktop(false);}catch{}}}
 function target(t,direction,p=period){const local=Math.max(0,direction==='cw'?t:t-(2*p+1.5)*1000),angle=(direction==='cw'?-1:1)*TAU*local/(p*1000);return {angle,targetX:Math.cos(angle),targetY:Math.sin(angle)};}
 function trajectory(t){if(t<period*2000)return 'cw';if(t<(period*2+1.5)*1000)return null;if(t<(period*4+1.5)*1000)return 'ccw';return 'done';}
 async function startRun(){if(!demo&&!CAL?.ok)return;const my=++tok;if(!demo&&!camOK())await startCam();if(my!==tok)return;show('stage');dark(true);$('btns').replaceChildren();$('cameraChoice').replaceChildren();rows=[];period=Number($('seconds').value);phase='countdown';placeDot(1,0);for(const n of [3,2,1]){cue(String(n));await sleep(1000);if(my!==tok)return;}cue('');runStart=performance.now();phase='running';expose();requestAnimationFrame(runTick);}
 function runTick(now){if(phase!=='running')return;const t=now-runStart,d=trajectory(t);if(d==='done'){finish();return;}if(!d){cue('反対回り');placeDot(1,0);}else{cue('');const q=target(t,d);point={x:q.targetX,y:q.targetY};drawField(true);if(demo)capture(now,null,null);}requestAnimationFrame(runTick);}
 let missingSince=0;
-function capture(now,pts,bs){const t=now-runStart,direction=trajectory(t);if(!direction||direction==='done')return;const q=target(t,direction);rows.push({t,pts,bs,...q,direction,...(demo?{synthetic:synthetic(t,direction)}:{})});if(!demo&&!pts){missingSince||=now;$('faceWarning').textContent=now-missingSince>700?'顔が見えません':'';}else{missingSince=0;{const e=!demo&&pts?eyeSize(pts):null;$('faceWarning').textContent=e===null?'':e<EYE_OK[0]*0.85?'スマホをもっと顔に近づけて':e>EYE_MAX?'近すぎます。少し離して':'';};}}
+function capture(now,pts,bs){const t=now-runStart,direction=trajectory(t);if(!direction||direction==='done')return;const q=target(t,direction);rows.push({t,pts,bs,...q,direction,...(demo?{synthetic:synthetic(t,direction)}:{})});if(!demo&&!pts){missingSince||=now;$('faceWarning').textContent=now-missingSince>700?missingFace():'';}else{missingSince=0;{const e=!demo&&pts?eyeSize(pts):null;$('faceWarning').textContent=e===null?'':e<EYE_OK[0]*0.85?'スマホをもっと顔に近づけて':e>EYE_MAX?'近すぎます。少し離して':'';};}}
 function demoCal(){return {ok:true,reliable:true,apRef:.3,x:{nm:'hx',mc:0,slope:1,sep:12},y:{nm:'vy',mc:0,slope:1,sep:12}};}
-function synthetic(t,direction){const q=target(t-150,direction),i=sector(q.angle);let a=q.angle,r=i===1?.65:1;if(i===5)a=Math.round(a/.35)*.35;return {X:1.3*r*Math.cos(a)+.1+.005*Math.sin(t*.029),Y:1.1*r*Math.sin(a)-.08+.005*Math.cos(t*.023),bl:false};}
+function synthetic(t,direction){const q=target(t-150,direction),i=sector(q.angle);let a=q.angle,r=i===(measuredEye==='left'?5:1)?.65:1;if(i===(measuredEye==='left'?1:5))a=Math.round(a/.35)*.35;return {X:1.3*r*Math.cos(a)+.1+.005*Math.sin(t*.029),Y:1.1*r*Math.sin(a)-.08+.005*Math.cos(t*.023),bl:false};}
 function syntheticRecords(p=8){period=p;const a=[];for(let t=0;t<(4*p+1.5)*1000;t+=1000/60){const direction=trajectory(t);if(direction)a.push({t,pts:null,bs:null,direction,...target(t,direction),synthetic:synthetic(t,direction)});}return a;}
 // 右回り・左回りごとに、読み方と遅れを全探索する。
 function axisFit(v,a){const mv=mean(v),ma=mean(a),ss=mean(a.map(x=>(x-ma)**2)),A=ss?mean(a.map((x,i)=>(x-ma)*(v[i]-mv)))/ss:0,B=mv-A*ma;return {A,B,sse:v.reduce((s,x,i)=>s+(x-A*a[i]-B)**2,0),sst:v.reduce((s,x)=>s+(x-mv)**2,0)};}
@@ -565,21 +584,61 @@ function pickCircle(fr,direction,p){let best=null;for(const cx of CAL.x.all||[CA
 function analyze(records,p=period){const trace=[],events=[],quality=[];let segment=0;for(const direction of ['cw','ccw']){const fr=records.filter(o=>o.direction===direction),fit=pickCircle(fr,direction,p),unread=!fit||fit.Ax<.35||fit.Ay<.35||fit.r2<.3;quality.push({direction,unread,...(fit?Object.fromEntries(Object.entries(fit).filter(([k])=>k!=='values')):{})});if(unread)continue;const raw=fr.map(o=>{const v=fit.values.get(o),q=target(o.t-fit.lag,direction,p),valid=!!v&&!v.bl&&Number.isFinite(v.X)&&Number.isFinite(v.Y);return {...o,...q,valid,x:valid?(v.X-fit.Bx)/Math.max(fit.Ax,.35):null,y:valid?(v.Y-fit.By)/Math.max(fit.Ay,.35):null};});let prev=null;for(const o of raw){if(!o.valid||!prev?.valid||o.t-prev.t>120||o.t<=prev.t)segment++;o.segment=segment;prev=o;}const sm=raw.map((o,i)=>{if(!o.valid)return o;const w=raw.slice(Math.max(0,i-1),i+2).filter(v=>v.valid&&v.segment===o.segment);return {...o,x:med(w.map(v=>v.x)),y:med(w.map(v=>v.y))};});const dx=[],dy=[];for(let i=1;i<raw.length;i++)if(raw[i].valid&&raw[i-1].valid&&raw[i].segment===raw[i-1].segment){dx.push(raw[i].x-raw[i-1].x);dy.push(raw[i].y-raw[i-1].y);}const noise=1.4826*Math.hypot(mad(dx),mad(dy)),angles=raw.filter(o=>o.valid).map(o=>wrap(o.angle-Math.atan2(o.y,o.x))*(direction==='cw'?-1:1)*180/Math.PI),base=med(angles);let event=null;const flush=()=>{if(event)events.push(event);event=null;};for(let i=0;i<sm.length;i++){const o=sm[i],a=sm[i-1];if(o.valid){const v=raw[i];o.reach=Math.hypot(v.x,v.y);o.lag=wrap(v.angle-Math.atan2(v.y,v.x))*(direction==='cw'?-1:1)*180/Math.PI-base;o.error=Math.hypot(v.x-v.targetX,v.y-v.targetY);}const move=a?Math.hypot(o.x-a.x,o.y-a.y):0,tm=a?Math.hypot(o.targetX-a.targetX,o.targetY-a.targetY):0,fast=a?.valid&&o.valid&&a.segment===o.segment&&move>Math.max(3*tm,.15,3*(noise||0));if(fast){if(!event)event={start:a,end:o,direction,sector:sector(o.angle)};else event.end=o;}else flush();}flush();trace.push(...sm);}const groups={};for(const d of ['cw','ccw','all'])groups[d]=names.map((name,i)=>{const a=trace.filter(o=>o.valid&&sector(o.angle)===i&&(d==='all'||o.direction===d));return {name,reach:a.length?med(a.map(o=>o.reach)):null,lag:a.length?med(a.map(o=>o.lag)):null,error:a.length?med(a.map(o=>o.error)):null,jumps:events.filter(e=>e.sector===i&&(d==='all'||e.direction===d)).length,frames:a.length};});return {trace,events,groups,quality};}
 const fmt=v=>Number.isFinite(v)?v.toFixed(2):'—';
 function hardText(groups){const a=groups.all.filter(r=>r.frames).map(r=>({...r,score:Math.max(0,1-r.reach)+r.jumps*.06+Math.max(0,r.lag)/180+r.error})).sort((a,b)=>b.score-a.score).slice(0,2);return a.length?'動きづらい方向：'+a.map(r=>`${r.name}（届き${fmt(r.reach)}・飛び${r.jumps}回）`).join('、'):'有効な記録がありません。合わせからやり直してください。';}
-function renderResult(data){current=data;period=data.period;rows=data.records||[];expose(data);show('result');$('preview').hidden=true;$('demoLabel').hidden=!data.demo;$('hard').textContent=data.hard;const bad=data.reference;$('quality').textContent=`見分け 横 ${fmt(data.calibration?.x?.sep)}・たて ${fmt(data.calibration?.y?.sep)} ／ 顔が読めたコマ ${fmt(data.faceRatio*100)}% ／ ${fmt(data.fps)} コマ/秒${bad?' ／ この回の結果は参考':''} ／ `+data.quality.map(q=>`${q.direction==='cw'?'右回り':'左回り'}：${q.unread?'この周はカメラで目の動きが小さくしか写らなかった':`${q.nm}・lag ${q.lag}ms・r2 ${fmt(q.r2)}`}`).join(' ／ ');$('again').disabled=!demo&&!CAL?.ok;$('csv').disabled=!rows.length;const host=$('tables');host.replaceChildren();for(const [key,label]of [['cw','右回り'],['ccw','左回り'],['all','合計']]){const table=document.createElement('table');table.innerHTML=`<caption>${label}</caption><thead><tr><th>方向</th><th>届き</th><th>遅れ°</th><th>飛び</th><th>ずれ</th></tr></thead><tbody>${data.groups[key].map(r=>`<tr><th>${r.name}</th><td>${r.reach!==null&&r.reach<.8?'<b style="color:#ffb4a8">'+fmt(r.reach)+'</b>':fmt(r.reach)}</td><td>${fmt(r.lag)}</td><td>${r.jumps}</td><td>${fmt(r.error)}</td></tr>`).join('')}</tbody>`;host.append(table);}drawResult(data);}
-function drawResult(data){const c=$('resultCanvas'),x=c.getContext('2d'),g={x:500,y:470,r:350};x.fillStyle='#050505';x.fillRect(0,0,c.width,c.height);x.fillStyle='#f4f1ea';x.font='24px "Shippori Mincho", serif';x.fillText('目の円トレース'+(data.demo?'（デモ）':''),35,40);for(let i=0;i<8;i++){const a=-i*TAU/8,e=data.groups.all[i].error,alpha=e===null?0:Math.min(.8,e);x.beginPath();x.arc(g.x,g.y,g.r+32,a-TAU/16,a+TAU/16);x.arc(g.x,g.y,g.r+8,a+TAU/16,a-TAU/16,true);x.closePath();x.fillStyle=`rgba(255,180,168,${alpha})`;x.fill();x.fillStyle='#f4f1ea';x.textAlign='center';x.fillText(names[i],g.x+Math.cos(a)*(g.r+64),g.y+Math.sin(a)*(g.r+64)+8);}x.textAlign='left';x.strokeStyle='#a8874f';x.lineWidth=2;x.beginPath();x.arc(g.x,g.y,g.r,0,TAU);x.stroke();let prev=null;for(const r of data.trace){if(!r.valid){prev=null;continue;}if(prev&&prev.direction===r.direction&&prev.segment===r.segment){x.strokeStyle=r.direction==='cw'?'#d8bd84':'#f4f1ea';x.lineWidth=2;x.beginPath();x.moveTo(g.x+prev.x*g.r,g.y-prev.y*g.r);x.lineTo(g.x+r.x*g.r,g.y-r.y*g.r);x.stroke();}prev=r;}for(const e of data.events){const a={x:g.x+e.start.x*g.r,y:g.y-e.start.y*g.r},b={x:g.x+e.end.x*g.r,y:g.y-e.end.y*g.r},angle=Math.atan2(b.y-a.y,b.x-a.x);x.strokeStyle='#ffb4a8';x.fillStyle='#ffb4a8';x.lineWidth=3;x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke();x.beginPath();x.moveTo(b.x,b.y);x.lineTo(b.x-12*Math.cos(angle-.4),b.y-12*Math.sin(angle-.4));x.lineTo(b.x-12*Math.cos(angle+.4),b.y-12*Math.sin(angle+.4));x.closePath();x.fill();}x.font='19px "Noto Sans JP", sans-serif';x.fillStyle='#d8bd84';x.fillText('金：右回り',35,925);x.fillStyle='#f4f1ea';x.fillText('白：左回り',240,925);x.fillStyle='#ffb4a8';x.fillText('赤い矢印：飛び',450,925);x.fillStyle='#9d978b';x.fillText('外周：ずれが大きい区画ほど赤',35,965);}
+function renderResult(data){document.querySelectorAll('.paired-extra').forEach(n=>n.remove());measuredEye=data.eye||'both';CAL=data.calibration;current=data;document.querySelector('#result h1').textContent=eyeLabel(data.eye)+'の結果';period=data.period;rows=data.records||[];expose(data);show('result');$('preview').hidden=true;$('demoLabel').hidden=!data.demo;$('hard').textContent=data.hard;const bad=data.reference;$('quality').textContent=`見分け 横 ${fmt(data.calibration?.x?.sep)}・たて ${fmt(data.calibration?.y?.sep)} ／ 顔が読めたコマ ${fmt(data.faceRatio*100)}% ／ ${fmt(data.fps)} コマ/秒${bad?' ／ この回の結果は参考':''} ／ `+data.quality.map(q=>`${q.direction==='cw'?'右回り':'左回り'}：${q.unread?'この周はカメラで目の動きが小さくしか写らなかった':`${q.nm}・lag ${q.lag}ms・r2 ${fmt(q.r2)}`}`).join(' ／ ');$('again').disabled=!demo&&!CAL?.ok;$('csv').disabled=!rows.length;const host=$('tables');host.replaceChildren();for(const [key,label]of [['cw','右回り'],['ccw','左回り'],['all','合計']]){const table=document.createElement('table');table.innerHTML=`<caption>${label}</caption><thead><tr><th>方向</th><th>届き</th><th>遅れ°</th><th>飛び</th><th>ずれ</th></tr></thead><tbody>${data.groups[key].map(r=>`<tr><th>${r.name}</th><td>${r.reach!==null&&r.reach<.8?'<b style="color:#ffb4a8">'+fmt(r.reach)+'</b>':fmt(r.reach)}</td><td>${fmt(r.lag)}</td><td>${r.jumps}</td><td>${fmt(r.error)}</td></tr>`).join('')}</tbody>`;host.append(table);}drawResult(data);}
 
-function finish(){phase='result';hideDot();const a=analyze(rows),faceRatio=rows.length?rows.filter(r=>r.pts||r.synthetic).length/rows.length:0,data={v:3,date:new Date().toISOString(),demo,period,calibration:CAL,records:rows,...a,hard:hardText(a.groups),faceRatio,fps:rows.length/(period*4),reference:!CAL?.reliable||a.quality.some(q=>q.unread)||faceRatio<.8};renderResult(data);try{const {records,...summary}=data;summary.trace=a.trace.map(({x,y,valid,direction,segment})=>({x,y,valid,direction,segment}));summary.events=a.events.map(e=>({...e,start:{x:e.start.x,y:e.start.y},end:{x:e.end.x,y:e.end.y}}));history.unshift(summary);history=history.slice(0,20);localStorage.setItem('eye-circle-history-v3',JSON.stringify(history));renderHistory();}catch{$('quality').textContent+=' ／ 端末への保存ができませんでした';}}
-function renderHistory(){const h=$('history');h.replaceChildren();if(!history.length)h.textContent='まだ記録はありません';for(const d of history){const b=document.createElement('button');b.textContent=new Date(d.date).toLocaleString('ja-JP')+' '+d.hard;b.onclick=()=>renderResult(d);h.append(b);}}
+function renderPair(results){
+  const [right,left]=results;
+  renderResult(left);
+  const extra=document.createElement('section');extra.className='paired-extra';
+  const title=document.createElement('h2');title.textContent='左目の結果';extra.append(title);
+  const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=1000;canvas.style.width='100%';canvas.getContext('2d').drawImage($('resultCanvas'),0,0);extra.append(canvas);
+  for(const id of ['hard','quality','tables'])extra.append($(id).cloneNode(true));
+  extra.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
+  renderResult(right);$('tables').after(extra);
+  const comparison=document.createElement('section');comparison.className='paired-extra';
+  const different=[];
+  const body=right.groups.all.map((r,i)=>{const l=left.groups.all[i],valid=r.reach!==null&&l.reach!==null,bad=valid&&((r.reach<.8)!==(l.reach<.8)||Math.abs(r.reach-l.reach)>=.15);if(bad)different.push(r.name);return `<tr${bad?' class="eye-difference"':''}><th>${r.name}</th><td>${r.reach!==null&&r.reach<.8?'<b style="color:var(--bad)">'+fmt(r.reach)+'</b>':fmt(r.reach)}</td><td>${l.reach!==null&&l.reach<.8?'<b style="color:var(--bad)">'+fmt(l.reach)+'</b>':fmt(l.reach)}</td><td>${r.jumps}</td><td>${l.jumps}</td></tr>`;}).join('');
+  comparison.innerHTML=`<h2>右目と左目の比べ</h2><table><thead><tr><th>方向</th><th>右目の届き</th><th>左目の届き</th><th>右目の飛び</th><th>左目の飛び</th></tr></thead><tbody>${body}</tbody></table><p>左右で差が大きい方向：${different.join('、')||'なし'}${right.groups.all.some((r,i)=>r.reach===null||left.groups.all[i].reach===null)?'（読めない方向は比較できません）':''}</p><h2>右目の結果</h2>`;
+  $('resultCanvas').before(comparison);document.querySelector('#result h1').textContent='右目・左目の結果';
+  current={...right,pair:results};rows=results.flatMap(d=>(d.records||[]).map(r=>({...r,eye:d.eye})));expose(current);
+}
+function drawResult(data,c=$('resultCanvas')){const x=c.getContext('2d'),g={x:500,y:470,r:350};x.fillStyle='#050505';x.fillRect(0,0,c.width,c.height);x.fillStyle='#f4f1ea';x.font='24px "Shippori Mincho", serif';x.fillText('目の円トレース・'+eyeLabel(data.eye)+(data.demo?'（デモ）':''),35,40);for(let i=0;i<8;i++){const a=-i*TAU/8,e=data.groups.all[i].error,alpha=e===null?0:Math.min(.8,e);x.beginPath();x.arc(g.x,g.y,g.r+32,a-TAU/16,a+TAU/16);x.arc(g.x,g.y,g.r+8,a+TAU/16,a-TAU/16,true);x.closePath();x.fillStyle=`rgba(255,180,168,${alpha})`;x.fill();x.fillStyle='#f4f1ea';x.textAlign='center';x.fillText(names[i],g.x+Math.cos(a)*(g.r+64),g.y+Math.sin(a)*(g.r+64)+8);}x.textAlign='left';x.strokeStyle='#a8874f';x.lineWidth=2;x.beginPath();x.arc(g.x,g.y,g.r,0,TAU);x.stroke();let prev=null;for(const r of data.trace){if(!r.valid){prev=null;continue;}if(prev&&prev.direction===r.direction&&prev.segment===r.segment){x.strokeStyle=r.direction==='cw'?'#d8bd84':'#f4f1ea';x.lineWidth=2;x.beginPath();x.moveTo(g.x+prev.x*g.r,g.y-prev.y*g.r);x.lineTo(g.x+r.x*g.r,g.y-r.y*g.r);x.stroke();}prev=r;}for(const e of data.events){const a={x:g.x+e.start.x*g.r,y:g.y-e.start.y*g.r},b={x:g.x+e.end.x*g.r,y:g.y-e.end.y*g.r},angle=Math.atan2(b.y-a.y,b.x-a.x);x.strokeStyle='#ffb4a8';x.fillStyle='#ffb4a8';x.lineWidth=3;x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);x.stroke();x.beginPath();x.moveTo(b.x,b.y);x.lineTo(b.x-12*Math.cos(angle-.4),b.y-12*Math.sin(angle-.4));x.lineTo(b.x-12*Math.cos(angle+.4),b.y-12*Math.sin(angle+.4));x.closePath();x.fill();}x.font='19px "Noto Sans JP", sans-serif';x.fillStyle='#d8bd84';x.fillText('金：右回り',35,925);x.fillStyle='#f4f1ea';x.fillText('白：左回り',240,925);x.fillStyle='#ffb4a8';x.fillText('赤い矢印：飛び',450,925);x.fillStyle='#9d978b';x.fillText('外周：ずれが大きい区画ほど赤',35,965);}
+
+function finish(){phase='result';hideDot();const a=analyze(rows),faceRatio=rows.length?rows.filter(r=>r.pts||r.synthetic).length/rows.length:0,data={v:3,eye:measuredEye,date:new Date().toISOString(),demo,period,calibration:CAL,records:rows,...a,hard:hardText(a.groups),faceRatio,fps:rows.length/(period*4),reference:!CAL?.reliable||a.quality.some(q=>q.unread)||faceRatio<.8};renderResult(data);if(!demo)try{const {records,...summary}=data;summary.trace=a.trace.map(({x,y,valid,direction,segment})=>({x,y,valid,direction,segment}));summary.events=a.events.map(e=>({...e,start:{x:e.start.x,y:e.start.y},end:{x:e.end.x,y:e.end.y}}));history.unshift(summary);history=history.slice(0,20);localStorage.setItem('eye-circle-history-v3',JSON.stringify(history));renderHistory();}catch{$('quality').textContent+=' ／ 端末への保存ができませんでした';}if(sessionMode==='pair'){pairedResults.push(data);if(measuredEye==='right'){measuredEye='left';begin();}else renderPair(pairedResults);}}
+function renderHistory(){const h=$('history');h.replaceChildren();if(!history.length)h.textContent='まだ記録はありません';for(const d of history){const b=document.createElement('button');b.textContent=new Date(d.date).toLocaleString('ja-JP')+' '+eyeLabel(d.eye)+' '+d.hard;b.onclick=()=>renderResult(d);h.append(b);}}
 function cancel(){tok++;rec=null;phase='home';camWanted=false;releaseCam();wl?.release();camFixBtn(false);$('faceWarning').textContent='';show('home');dark(true);}
 function download(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
-$('bStart').onclick=begin;$('stop').onclick=cancel;$('back').onclick=cancel;$('again').onclick=startRun;$('recalibrate').onclick=begin;$('fullscreen').onclick=async()=>{try{await document.documentElement.requestFullscreen();}catch{}};
-$('png').onclick=()=>$('resultCanvas').toBlob(b=>{if(b)download(b,'eye-circle.png');});
-$('csv').onclick=()=>{const keys=['t','direction','angle','targetX','targetY','pts','bs','synthetic'],quote=v=>'"'+JSON.stringify(v??null).replaceAll('"','""')+'"';download(new Blob(['\uFEFF'+keys.join(',')+'\n'+rows.map(r=>keys.map(k=>quote(r[k])).join(',')).join('\n')],{type:'text/csv;charset=utf-8'}),'eye-circle.csv');};
+$('bStart').onclick=()=>startSession('pair');$('startRight').onclick=()=>startSession('right');$('startLeft').onclick=()=>startSession('left');$('startBoth').onclick=()=>startSession('both');$('stop').onclick=cancel;$('back').onclick=cancel;$('again').onclick=()=>{if(current?.pair)startSession('pair');else{measuredEye=current?.eye||'both';sessionMode=measuredEye;pairedResults=[];if(measuredEye!==calibratedEye)begin();else startRun();}};$('recalibrate').onclick=()=>startSession(current?.pair?'pair':measuredEye);$('fullscreen').onclick=async()=>{try{await document.documentElement.requestFullscreen();}catch{}};
+function pairImage(results){
+  const [right,left]=results,c=document.createElement('canvas');c.width=1000;c.height=2800;
+  const x=c.getContext('2d');x.fillStyle='#050505';x.fillRect(0,0,c.width,c.height);
+  const chart=document.createElement('canvas');chart.width=1000;chart.height=1000;
+  for(const [i,data] of results.entries()){drawResult(data,chart);x.drawImage(chart,0,i*1000);}
+  x.fillStyle='#d8bd84';x.font='30px "Noto Sans JP", sans-serif';x.fillText('右目と左目の比べ',35,2050);
+  const columns=[130,355,545,735,915],different=[];
+  x.font='22px "Noto Sans JP", sans-serif';x.textAlign='center';
+  ['方向','右目の届き','左目の届き','右目の飛び','左目の飛び'].forEach((label,i)=>x.fillText(label,columns[i],2110));
+  right.groups.all.forEach((r,i)=>{
+    const l=left.groups.all[i],valid=r.reach!==null&&l.reach!==null,bad=valid&&((r.reach<.8)!==(l.reach<.8)||Math.abs(r.reach-l.reach)>=.15),y=2165+i*52;
+    if(bad){different.push(r.name);x.fillStyle='#302719';x.fillRect(35,y-34,930,48);}
+    x.fillStyle='#d8bd84';[r.name,fmt(r.reach),fmt(l.reach),r.jumps,l.jumps].forEach((value,j)=>x.fillText(String(value),columns[j],y));
+    x.strokeStyle='#a8874f';x.beginPath();x.moveTo(35,y+12);x.lineTo(965,y+12);x.stroke();
+  });
+  x.textAlign='left';x.fillStyle='#d8bd84';
+  const note='左右で差が大きい方向：'+(different.join('、')||'なし');
+  let line='',y=2635;
+  for(const char of note){if(x.measureText(line+char).width>930){x.fillText(line,35,y);line='';y+=34;}line+=char;}
+  x.fillText(line,35,y);
+  if(right.groups.all.some((r,i)=>r.reach===null||left.groups.all[i].reach===null))x.fillText('（読めない方向は比較できません）',35,y+40);
+  return c;
+}
+$('png').onclick=()=>{const canvas=current?.pair?pairImage(current.pair):$('resultCanvas');canvas.toBlob(b=>{if(b)download(b,'eye-circle.png');});};
+$('csv').onclick=()=>{const keys=['eye','t','direction','angle','targetX','targetY','pts','bs','synthetic'],quote=v=>'"'+JSON.stringify(v??null).replaceAll('"','""')+'"';download(new Blob(['\uFEFF'+keys.join(',')+'\n'+rows.map(r=>keys.map(k=>quote(k==='eye'?eyeLabel(r.eye||current.eye):r[k])).join(',')).join('\n')],{type:'text/csv;charset=utf-8'}),'eye-circle.csv');};
 function validHistory(d){const num=Number.isFinite,nullable=x=>x===null||num(x),row=r=>r&&names.includes(r.name)&&['reach','lag','error'].every(k=>nullable(r[k]))&&Number.isInteger(r.jumps)&&r.jumps>=0&&Number.isInteger(r.frames)&&r.frames>=0;return d?.v===3&&num(Date.parse(d.date))&&typeof d.demo==='boolean'&&typeof d.hard==='string'&&num(d.period)&&d.period>0&&num(d.faceRatio)&&num(d.fps)&&Array.isArray(d.trace)&&d.trace.every(r=>r&&typeof r.valid==='boolean'&&['cw','ccw'].includes(r.direction)&&(!r.valid||(num(r.x)&&num(r.y)&&Number.isInteger(r.segment))))&&Array.isArray(d.events)&&d.events.every(e=>e&&[e.start,e.end].every(r=>r&&num(r.x)&&num(r.y)))&&Array.isArray(d.quality)&&d.quality.every(q=>q&&typeof q.unread==='boolean'&&['cw','ccw'].includes(q.direction))&&['cw','ccw','all'].every(k=>Array.isArray(d.groups?.[k])&&d.groups[k].length===8&&d.groups[k].every(row));}
 try{const a=JSON.parse(localStorage.getItem('eye-circle-history-v3')||'[]');history=Array.isArray(a)?a.filter(validHistory).slice(0,20):[];}catch{history=[];}renderHistory();
 const note=document.createElement('p');note.className='muted';note.textContent='届きは全体の振れ幅を1にそろえた値です。「届いていない」は、ほかの向きより届いていないという意味です。遅れ°は、その周全体より遅れる角度です（＋が遅れ）。届きが赤いのは0.8未満＝届いていない向きです。左右は本人から見た向きです。';$('tables').before(note);
 expose();
-if(demo){$('bStart').disabled=false;$('loadState').textContent='デモの準備ができました（合成データ）';}else import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/vision_bundle.mjs').then(m=>{FilesetResolver=m.FilesetResolver;FaceLandmarker=m.FaceLandmarker;return load();}).catch(e=>{$('loadState').textContent='読み込みに失敗しました：'+e.message;});
+if(demo){readyStarts();$('loadState').textContent='デモの準備ができました（合成データ）';}else import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/vision_bundle.mjs').then(m=>{FilesetResolver=m.FilesetResolver;FaceLandmarker=m.FaceLandmarker;return load();}).catch(e=>{$('loadState').textContent='読み込みに失敗しました：'+e.message;});
 if(!demo&&!test&&'serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
@@ -590,10 +649,5 @@ function menu(open){$('side').classList.toggle('open',open);$('menuOverlay').cla
 $('menuBtn').onclick=()=>menu(true);$('closeMenu').onclick=()=>menu(false);$('menuOverlay').onclick=()=>menu(false);
 addEventListener('keydown',e=>{if(e.key==='Escape'&&$('side').classList.contains('open'))menu(false);});
 $('history').addEventListener('click',e=>{if(e.target.closest('button'))menu(false);});
-// デモは既存の合成データと計算で結果を表示する。履歴には追加しない。
-if(demo){
-  openApp(); CAL=demoCal(); const records=syntheticRecords(Number($('seconds').value)),a=analyze(records);
-  renderResult({v:3,date:new Date().toISOString(),demo:true,period,calibration:CAL,records,...a,hard:hardText(a.groups),faceRatio:1,fps:records.length/(period*4),reference:false});
-}
-
+if(demo)openApp();
 </script></body></html>
